@@ -51,7 +51,7 @@ async def get_status() -> dict[str, Any]:
 
 async def get_alerts() -> list[IpsAlertResponse]:
     """Return all recorded IPS alerts from the database."""
-    async with await get_db() as db:
+    async with get_db() as db:
         rows = await db.execute_fetchall(
             "SELECT * FROM ips_alerts ORDER BY triggered_at DESC"
         )
@@ -80,7 +80,7 @@ async def _poll_devices() -> None:
     history_rows: list[tuple[int, float]] = []
     anomaly_events: list[tuple[int, float, float]] = []
 
-    async with await get_db() as db:
+    async with get_db() as db:
         rows = await db.execute_fetchall("SELECT id, ip FROM devices")
         devices = {row["ip"]: row["id"] for row in rows}
 
@@ -121,7 +121,7 @@ async def _handle_anomaly(device_id: int, rate_kbps: float, threshold: float) ->
     """Log the anomaly, send email alert, apply a temporary block rule."""
     logger.warning("IPS anomaly: device=%d rate=%.2f kbps threshold=%.2f kbps", device_id, rate_kbps, threshold)
 
-    async with await get_db() as db:
+    async with get_db() as db:
         row = await db.execute_fetchall("SELECT ip FROM devices WHERE id = ?", (device_id,))
         if not row:
             return
@@ -164,7 +164,7 @@ def _read_proc_net_dev() -> dict[str, int]:
                     rx_bytes = int(parts[1])
                     result[iface] = rx_bytes
     except FileNotFoundError:
-        logger.warning("/proc/net/dev not found — not running on Linux")
+        logger.debug("/proc/net/dev not found — not running on Linux")
     return result
 
 

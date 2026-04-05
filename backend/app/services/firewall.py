@@ -20,7 +20,7 @@ def _validate_ip(ip: str) -> str:
 
 async def get_all_rules() -> list[FirewallRuleResponse]:
     """Return all whitelist rules from the database."""
-    async with await get_db() as db:
+    async with get_db() as db:
         rows = await db.execute_fetchall("SELECT * FROM firewall_rules ORDER BY id")
         return [FirewallRuleResponse(**dict(row)) for row in rows]
 
@@ -29,7 +29,7 @@ async def add_rule(rule: FirewallRuleCreate) -> FirewallRuleResponse:
     """Validate and persist a new whitelist rule."""
     dest_ip = _validate_ip(str(rule.dest_ip))
 
-    async with await get_db() as db:
+    async with get_db() as db:
         cursor = await db.execute(
             "INSERT INTO firewall_rules (device_id, dest_ip, dest_port, protocol) VALUES (?, ?, ?, ?)",
             (rule.device_id, dest_ip, rule.dest_port, rule.protocol),
@@ -41,7 +41,7 @@ async def add_rule(rule: FirewallRuleCreate) -> FirewallRuleResponse:
 
 async def delete_rule(rule_id: int) -> bool:
     """Delete a rule by ID. Returns False if not found."""
-    async with await get_db() as db:
+    async with get_db() as db:
         row = await db.execute_fetchall("SELECT id FROM firewall_rules WHERE id = ?", (rule_id,))
         if not row:
             return False
@@ -58,7 +58,7 @@ async def apply_all_rules() -> None:
     rules = await get_all_rules()
 
     # Fetch device IPs for each rule
-    async with await get_db() as db:
+    async with get_db() as db:
         device_ips: dict[int, str] = {}
         rows = await db.execute_fetchall("SELECT id, ip FROM devices")
         for row in rows:
@@ -92,6 +92,13 @@ async def apply_all_rules() -> None:
 
         await shell.run_async(cmd)
         logger.debug("Applied rule %d: %s → %s:%s/%s", rule.id, device_ip, str(rule.dest_ip), rule.dest_port, rule.protocol)
+
+    # Allow return traffic for established connections
+    await shell.run_async([
+        "iptables", "-A", "FORWARD",
+        "-m", "state", "--state", "ESTABLISHED,RELATED",
+        "-j", "ACCEPT",
+    ])
 
     # Default DROP for unmatched forwarded traffic
     await shell.run_async(["iptables", "-A", "FORWARD", "-j", "DROP"])

@@ -41,7 +41,7 @@ async def _stop_capture_after_delay(device_id: int, delay: int) -> None:
 
     await asyncio.to_thread(proc.terminate)
 
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
             "UPDATE capture_sessions SET stopped_at=datetime('now') WHERE device_id=? AND stopped_at IS NULL",
             (device_id,),
@@ -57,7 +57,7 @@ async def start_capture(req: CaptureStartRequest) -> list[CaptureSessionResponse
     if req.duration is not None and req.duration <= 0:
         raise ValueError("Capture duration must be greater than 0")
 
-    async with await get_db() as db:
+    async with get_db() as db:
         for device_id in req.device_ids:
             if device_id in _active_captures:
                 logger.warning("Capture already running for device %d — skipping", device_id)
@@ -111,7 +111,7 @@ async def stop_capture(device_id: int) -> bool:
 
     await asyncio.to_thread(proc.terminate)
 
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
             "UPDATE capture_sessions SET stopped_at=datetime('now') WHERE device_id=? AND stopped_at IS NULL",
             (device_id,),

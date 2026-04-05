@@ -1,3 +1,6 @@
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+
 import aiosqlite
 
 from app.config import settings
@@ -5,11 +8,23 @@ from app.config import settings
 DB_PATH = settings.db_path
 
 
-async def _connect_db() -> aiosqlite.Connection:
-    conn = await aiosqlite.connect(DB_PATH)
-    await conn.execute("PRAGMA foreign_keys = ON")
-    conn.row_factory = aiosqlite.Row
-    return conn
+@asynccontextmanager
+async def get_db() -> AsyncIterator[aiosqlite.Connection]:
+    """Open a database connection as an async context manager.
+
+    Usage::
+
+        async with get_db() as db:
+            rows = await db.execute_fetchall("SELECT ...")
+    """
+    db = await aiosqlite.connect(DB_PATH)
+    try:
+        await db.execute("PRAGMA foreign_keys = ON")
+        db.row_factory = aiosqlite.Row
+        yield db
+    finally:
+        await db.close()
+
 
 _CREATE_TABLES = """
 CREATE TABLE IF NOT EXISTS devices (
@@ -64,13 +79,8 @@ CREATE TABLE IF NOT EXISTS ips_alerts (
 """
 
 
-async def get_db() -> aiosqlite.Connection:
-    """Open and return a database connection with row_factory set."""
-    return await _connect_db()
-
-
 async def init_db() -> None:
     """Create all tables on startup if they do not already exist."""
-    async with await _connect_db() as db:
+    async with get_db() as db:
         await db.executescript(_CREATE_TABLES)
         await db.commit()

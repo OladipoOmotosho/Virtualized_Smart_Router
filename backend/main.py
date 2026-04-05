@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -5,11 +7,25 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
 from app.routes import capture, devices, firewall, ips, logs
+from app.services import firewall as firewall_service
+from app.services import ips as ips_service
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+
+    # Re-apply saved firewall rules on startup
+    try:
+        await firewall_service.apply_all_rules()
+    except Exception:
+        logger.warning("Failed to apply firewall rules on startup", exc_info=True)
+
+    # Start the IPS background monitor
+    asyncio.create_task(ips_service.monitor_loop())
+
     yield
 
 
