@@ -33,7 +33,7 @@ export default function LogsPage() {
 
   useEffect(() => {
     fetchTraffic();
-  }, [fetchTraffic]);
+  }, [fetchTraffic, days]);
 
   useEffect(() => {
     fetchSystemLogs();
@@ -48,7 +48,11 @@ export default function LogsPage() {
             Traffic history and system activity
           </p>
         </div>
-        <Button variant="danger" onClick={purge}>
+        <Button variant="danger" onClick={() => {
+          if (window.confirm("Are you sure you want to purge old logs? This cannot be undone.")) {
+            purge();
+          }
+        }}>
           <Trash2 size={14} /> Purge Old Logs
         </Button>
       </div>

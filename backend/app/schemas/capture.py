@@ -4,9 +4,9 @@ from pydantic import BaseModel, Field
 
 
 class CaptureStartRequest(BaseModel):
-    device_ids: list[int] = Field(..., description="Device IDs to capture traffic for")
+    device_ids: list[int] = Field(..., min_length=1, description="Device IDs to capture traffic for")
     duration: Optional[int] = Field(None, gt=0, description="Capture duration in seconds")
-    packet_count: Optional[int] = Field(None, description="Max number of packets to capture")
+    packet_count: Optional[int] = Field(None, gt=0, description="Max number of packets to capture")
 
 
 class CaptureStopRequest(BaseModel):

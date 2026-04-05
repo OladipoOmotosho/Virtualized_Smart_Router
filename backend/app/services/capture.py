@@ -1,8 +1,10 @@
 """Packet capture service: tcpdump session lifecycle and pcap file management."""
 
 import asyncio
+import ipaddress
 import logging
 import os
+import subprocess
 from datetime import datetime
 from typing import Optional
 
@@ -14,7 +16,7 @@ from app.utils import shell
 logger = logging.getLogger(__name__)
 
 # device_id → subprocess.Popen handle for active captures
-_active_captures: dict[int, object] = {}
+_active_captures: dict[int, subprocess.Popen[bytes]] = {}
 
 # device_id → scheduled stop task for duration-limited captures
 _capture_stop_tasks: dict[int, asyncio.Task[None]] = {}
@@ -54,9 +56,6 @@ async def start_capture(req: CaptureStartRequest) -> list[CaptureSessionResponse
     os.makedirs(settings.pcap_dir, exist_ok=True)
     sessions: list[CaptureSessionResponse] = []
 
-    if req.duration is not None and req.duration <= 0:
-        raise ValueError("Capture duration must be greater than 0")
-
     async with get_db() as db:
         for device_id in req.device_ids:
             if device_id in _active_captures:
@@ -68,7 +67,7 @@ async def start_capture(req: CaptureStartRequest) -> list[CaptureSessionResponse
                 logger.warning("Device %d not found — skipping capture", device_id)
                 continue
 
-            device_ip = row[0]["ip"]
+            device_ip = str(ipaddress.ip_address(row[0]["ip"]))
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             pcap_file = os.path.join(settings.pcap_dir, f"device_{device_id}_{timestamp}.pcap")
 

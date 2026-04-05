@@ -24,9 +24,18 @@ async def lifespan(app: FastAPI):
         logger.warning("Failed to apply firewall rules on startup", exc_info=True)
 
     # Start the IPS background monitor
-    asyncio.create_task(ips_service.monitor_loop())
+    monitor_task = asyncio.create_task(ips_service.monitor_loop())
 
     yield
+
+    # Graceful shutdown: cancel the IPS monitor
+    monitor_task.cancel()
+    try:
+        await monitor_task
+    except asyncio.CancelledError:
+        logger.info("IPS monitor task cancelled")
+    except Exception:
+        logger.exception("IPS monitor task raised during shutdown")
 
 
 app = FastAPI(

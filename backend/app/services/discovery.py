@@ -74,7 +74,7 @@ def _read_arp_table() -> list[tuple[str, str]]:
                 parts = line.split()
                 if len(parts) >= 4:
                     ip, mac = parts[0], parts[3]
-                    if _IP_RE.match(ip) and _MAC_RE.match(mac) and mac != "00:00:00:00:00:00":
+                    if _IP_RE.fullmatch(ip) and _MAC_RE.fullmatch(mac) and mac != "00:00:00:00:00:00":
                         entries.append((mac, ip))
     except FileNotFoundError:
         logger.warning("/proc/net/arp not found — not running on Linux")
