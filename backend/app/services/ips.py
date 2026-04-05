@@ -24,6 +24,20 @@ DEFAULT_THRESHOLD_KBPS: float = 500.0
 # How long (seconds) to temporarily block a device after an anomaly
 BLOCK_DURATION_SECONDS: int = 300
 
+# Keep references to scheduled block-removal tasks so they are not garbage-collected.
+ACTIVE_BLOCK_TASKS: set[asyncio.Task[None]] = set()
+
+
+def _log_block_task_result(task: asyncio.Task[None]) -> None:
+    ACTIVE_BLOCK_TASKS.discard(task)
+    try:
+        exception = task.exception()
+    except asyncio.CancelledError:
+        return
+
+    if exception is not None:
+        logger.error("Scheduled block removal failed", exc_info=(type(exception), exception, exception.__traceback__))
+
 
 async def get_status() -> dict[str, Any]:
     """Return IPS monitoring status and per-device thresholds."""
@@ -63,38 +77,44 @@ async def _poll_devices() -> None:
     """Read /proc/net/dev counters and check each device against its threshold."""
     counters = await asyncio.to_thread(_read_proc_net_dev)
 
+    history_rows: list[tuple[int, float]] = []
+    anomaly_events: list[tuple[int, float, float]] = []
+
     async with await get_db() as db:
         rows = await db.execute_fetchall("SELECT id, ip FROM devices")
         devices = {row["ip"]: row["id"] for row in rows}
 
-    now = time.monotonic()
+        now = time.monotonic()
 
-    for iface, rx_bytes in counters.items():
-        # Map interface name to device — in namespace setup each veth has a known name
-        device_id = _interface_to_device_id(iface, devices)
-        if device_id is None:
-            continue
+        for iface, rx_bytes in counters.items():
+            # Map interface name to device — in namespace setup each veth has a known name
+            device_id = _interface_to_device_id(iface, devices)
+            if device_id is None:
+                continue
 
-        if device_id in _prev_counters:
-            prev_bytes, prev_time = _prev_counters[device_id]
-            delta_bytes = rx_bytes - prev_bytes
-            delta_time = now - prev_time
-            rate_kbps = (delta_bytes / 1024) / delta_time if delta_time > 0 else 0.0
+            if device_id in _prev_counters:
+                prev_bytes, prev_time = _prev_counters[device_id]
+                delta_bytes = rx_bytes - prev_bytes
+                delta_time = now - prev_time
+                rate_kbps = (delta_bytes / 1024) / delta_time if delta_time > 0 else 0.0
 
-            threshold = _thresholds.get(device_id, DEFAULT_THRESHOLD_KBPS)
+                threshold = _thresholds.get(device_id, DEFAULT_THRESHOLD_KBPS)
+                history_rows.append((device_id, rate_kbps))
 
-            # Record traffic history
-            async with await get_db() as db:
-                await db.execute(
-                    "INSERT INTO traffic_history (device_id, rate_kbps) VALUES (?, ?)",
-                    (device_id, rate_kbps),
-                )
-                await db.commit()
+                if rate_kbps > threshold:
+                    anomaly_events.append((device_id, rate_kbps, threshold))
 
-            if rate_kbps > threshold:
-                await _handle_anomaly(device_id, rate_kbps, threshold)
+            _prev_counters[device_id] = (rx_bytes, now)
 
-        _prev_counters[device_id] = (rx_bytes, now)
+        if history_rows:
+            await db.executemany(
+                "INSERT INTO traffic_history (device_id, rate_kbps) VALUES (?, ?)",
+                history_rows,
+            )
+            await db.commit()
+
+    for device_id, rate_kbps, threshold in anomaly_events:
+        await _handle_anomaly(device_id, rate_kbps, threshold)
 
 
 async def _handle_anomaly(device_id: int, rate_kbps: float, threshold: float) -> None:
@@ -121,7 +141,9 @@ async def _handle_anomaly(device_id: int, rate_kbps: float, threshold: float) ->
     logger.info("Temporary block applied for %s (%ds)", device_ip, BLOCK_DURATION_SECONDS)
 
     # Schedule rule removal after block duration
-    asyncio.create_task(_remove_block(device_ip, BLOCK_DURATION_SECONDS))
+    task = asyncio.create_task(_remove_block(device_ip, BLOCK_DURATION_SECONDS))
+    ACTIVE_BLOCK_TASKS.add(task)
+    task.add_done_callback(_log_block_task_result)
 
 
 async def _remove_block(device_ip: str, delay: int) -> None:

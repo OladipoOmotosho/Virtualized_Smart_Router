@@ -27,12 +27,12 @@ async def get_all_rules() -> list[FirewallRuleResponse]:
 
 async def add_rule(rule: FirewallRuleCreate) -> FirewallRuleResponse:
     """Validate and persist a new whitelist rule."""
-    _validate_ip(rule.dest_ip)
+    dest_ip = _validate_ip(str(rule.dest_ip))
 
     async with await get_db() as db:
         cursor = await db.execute(
             "INSERT INTO firewall_rules (device_id, dest_ip, dest_port, protocol) VALUES (?, ?, ?, ?)",
-            (rule.device_id, rule.dest_ip, rule.dest_port, rule.protocol),
+            (rule.device_id, dest_ip, rule.dest_port, rule.protocol),
         )
         await db.commit()
         row = await db.execute_fetchall("SELECT * FROM firewall_rules WHERE id = ?", (cursor.lastrowid,))
@@ -73,18 +73,25 @@ async def apply_all_rules() -> None:
             logger.warning("Device %d not found — skipping rule %d", rule.device_id, rule.id)
             continue
 
+        try:
+            device_ip = _validate_ip(device_ip)
+        except ValueError:
+            logger.warning("Invalid device IP %s — skipping rule %d", device_ip, rule.id)
+            continue
+
         cmd = [
             "iptables", "-A", "FORWARD",
             "-s", device_ip,
-            "-d", rule.dest_ip,
+            "-d", str(rule.dest_ip),
             "-p", rule.protocol,
-            "-j", "ACCEPT",
         ]
         if rule.dest_port:
             cmd += ["--dport", str(rule.dest_port)]
 
+        cmd += ["-j", "ACCEPT"]
+
         await shell.run_async(cmd)
-        logger.debug("Applied rule %d: %s → %s:%s/%s", rule.id, device_ip, rule.dest_ip, rule.dest_port, rule.protocol)
+        logger.debug("Applied rule %d: %s → %s:%s/%s", rule.id, device_ip, str(rule.dest_ip), rule.dest_port, rule.protocol)
 
     # Default DROP for unmatched forwarded traffic
     await shell.run_async(["iptables", "-A", "FORWARD", "-j", "DROP"])

@@ -54,7 +54,9 @@ for i in $(seq 1 "${NUM_DEVICES}"); do
 done
 
 # NAT for outbound traffic
-iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o "${GATEWAY_IFACE}" -j MASQUERADE 2>/dev/null || true
+if ! iptables -t nat -C POSTROUTING -s 10.0.0.0/24 -o "${GATEWAY_IFACE}" -j MASQUERADE 2>/dev/null; then
+    iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o "${GATEWAY_IFACE}" -j MASQUERADE
+fi
 
 echo ""
 echo "Namespace setup complete. Devices:"

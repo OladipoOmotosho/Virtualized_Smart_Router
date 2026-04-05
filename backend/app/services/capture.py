@@ -16,11 +16,46 @@ logger = logging.getLogger(__name__)
 # device_id → subprocess.Popen handle for active captures
 _active_captures: dict[int, object] = {}
 
+# device_id → scheduled stop task for duration-limited captures
+_capture_stop_tasks: dict[int, asyncio.Task[None]] = {}
+
+
+def _log_capture_stop_task_result(device_id: int, task: asyncio.Task[None]) -> None:
+    current_task = _capture_stop_tasks.get(device_id)
+    if current_task is task:
+        _capture_stop_tasks.pop(device_id, None)
+    try:
+        exception = task.exception()
+    except asyncio.CancelledError:
+        return
+
+    if exception is not None:
+        logger.error("Scheduled capture stop failed", exc_info=(type(exception), exception, exception.__traceback__))
+
+
+async def _stop_capture_after_delay(device_id: int, delay: int) -> None:
+    await asyncio.sleep(delay)
+    proc = _active_captures.pop(device_id, None)
+    if proc is None:
+        return
+
+    await asyncio.to_thread(proc.terminate)
+
+    async with await get_db() as db:
+        await db.execute(
+            "UPDATE capture_sessions SET stopped_at=datetime('now') WHERE device_id=? AND stopped_at IS NULL",
+            (device_id,),
+        )
+        await db.commit()
+
 
 async def start_capture(req: CaptureStartRequest) -> list[CaptureSessionResponse]:
     """Start tcpdump for each requested device. Skips devices already being captured."""
     os.makedirs(settings.pcap_dir, exist_ok=True)
     sessions: list[CaptureSessionResponse] = []
+
+    if req.duration is not None and req.duration <= 0:
+        raise ValueError("Capture duration must be greater than 0")
 
     async with await get_db() as db:
         for device_id in req.device_ids:
@@ -56,11 +91,20 @@ async def start_capture(req: CaptureStartRequest) -> list[CaptureSessionResponse
             )
             sessions.append(CaptureSessionResponse(**dict(row[0])))
 
+            if req.duration is not None:
+                task = asyncio.create_task(_stop_capture_after_delay(device_id, req.duration))
+                _capture_stop_tasks[device_id] = task
+                task.add_done_callback(lambda t, device_id=device_id: _log_capture_stop_task_result(device_id, t))
+
     return sessions
 
 
 async def stop_capture(device_id: int) -> bool:
     """Terminate the tcpdump process for a device. Returns False if no session is active."""
+    stop_task = _capture_stop_tasks.pop(device_id, None)
+    if stop_task is not None:
+        stop_task.cancel()
+
     proc = _active_captures.pop(device_id, None)
     if proc is None:
         return False

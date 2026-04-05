@@ -4,6 +4,13 @@ from app.config import settings
 
 DB_PATH = settings.db_path
 
+
+async def _connect_db() -> aiosqlite.Connection:
+    conn = await aiosqlite.connect(DB_PATH)
+    await conn.execute("PRAGMA foreign_keys = ON")
+    conn.row_factory = aiosqlite.Row
+    return conn
+
 _CREATE_TABLES = """
 CREATE TABLE IF NOT EXISTS devices (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,13 +66,11 @@ CREATE TABLE IF NOT EXISTS ips_alerts (
 
 async def get_db() -> aiosqlite.Connection:
     """Open and return a database connection with row_factory set."""
-    conn = await aiosqlite.connect(DB_PATH)
-    conn.row_factory = aiosqlite.Row
-    return conn
+    return await _connect_db()
 
 
 async def init_db() -> None:
     """Create all tables on startup if they do not already exist."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with await _connect_db() as db:
         await db.executescript(_CREATE_TABLES)
         await db.commit()

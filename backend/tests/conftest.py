@@ -26,8 +26,7 @@ def mock_shell():
 
 @pytest.fixture
 def client():
-    """FastAPI TestClient with a fresh in-memory DB for each test."""
-    import aiosqlite
+    """FastAPI TestClient."""
 
     from main import app
 
