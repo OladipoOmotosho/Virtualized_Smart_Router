@@ -99,8 +99,7 @@ async def _poll_devices() -> None:
 
                 # Handle /proc/net/dev counter wraparound
                 if delta_bytes < 0:
-                    wrap_mod = 2**32 if prev_bytes < 2**32 else 2**64
-                    delta_bytes += wrap_mod
+                    delta_bytes += 2**64
 
                 rate_kbps = (delta_bytes / 1024) / delta_time if delta_time > 0 else 0.0
 

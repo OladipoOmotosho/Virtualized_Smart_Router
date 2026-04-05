@@ -1,6 +1,7 @@
 """Device discovery: ARP scan, DHCP lease parsing, MAC OUI vendor lookup."""
 
 import asyncio
+import ipaddress
 import logging
 import re
 from typing import Optional
@@ -12,7 +13,6 @@ from app.utils import shell
 logger = logging.getLogger(__name__)
 
 _MAC_RE = re.compile(r"([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}")
-_IP_RE = re.compile(r"\d{1,3}(\.\d{1,3}){3}")
 
 
 async def get_all_devices() -> list[DeviceResponse]:
@@ -74,8 +74,12 @@ def _read_arp_table() -> list[tuple[str, str]]:
                 parts = line.split()
                 if len(parts) >= 4:
                     ip, mac = parts[0], parts[3]
-                    if _IP_RE.fullmatch(ip) and _MAC_RE.fullmatch(mac) and mac != "00:00:00:00:00:00":
-                        entries.append((mac, ip))
+                    if _MAC_RE.fullmatch(mac) and mac != "00:00:00:00:00:00":
+                        try:
+                            ipaddress.ip_address(ip)
+                            entries.append((mac, ip))
+                        except ValueError:
+                            pass
     except FileNotFoundError:
         logger.warning("/proc/net/arp not found — not running on Linux")
     return entries
