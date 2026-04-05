@@ -1,4 +1,8 @@
-"""smtplib helper for sending IPS anomaly alert emails."""
+"""smtplib helper for sending IPS anomaly alert emails.
+
+Note: send_alert() is a blocking/synchronous function.
+Callers in async code should use ``asyncio.to_thread(send_alert, ...)``.
+"""
 
 import logging
 import smtplib

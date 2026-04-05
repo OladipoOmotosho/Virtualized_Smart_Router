@@ -116,9 +116,9 @@ export default function CapturePage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {["Filename", "Size", "Created", ""].map((h) => (
+                {["Filename", "Size", "Created", ""].map((h, idx) => (
                   <th
-                    key={h}
+                    key={h || `header-${idx}`}
                     className="text-left px-4 py-3 font-medium text-gray-500"
                   >
                     {h}

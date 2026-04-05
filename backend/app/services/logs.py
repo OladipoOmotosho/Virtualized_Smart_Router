@@ -71,13 +71,15 @@ async def purge_old_logs() -> LogPurgeResponse:
             "DELETE FROM traffic_history WHERE recorded_at < datetime('now', ? || ' days')",
             (f"-{retention}",),
         )
+        c1_rowcount = c1.rowcount
         c2 = await db.execute(
             "DELETE FROM ips_alerts WHERE triggered_at < datetime('now', ? || ' days')",
             (f"-{retention}",),
         )
+        c2_rowcount = c2.rowcount
         await db.commit()
 
-    deleted = c1.rowcount + c2.rowcount
+    deleted = c1_rowcount + c2_rowcount
     logger.info("Purged %d old log records (retention=%d days)", deleted, retention)
     return LogPurgeResponse(
         deleted_count=deleted,

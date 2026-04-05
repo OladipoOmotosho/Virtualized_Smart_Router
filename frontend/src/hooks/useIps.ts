@@ -12,6 +12,7 @@ export function useIps() {
 
   const fetchStatus = useCallback(async () => {
     try {
+      setError(null);
       const data = await api.get<IpsStatus>("/ips/status");
       setStatus(data);
     } catch (err) {

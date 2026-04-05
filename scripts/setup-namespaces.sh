@@ -37,8 +37,10 @@ for i in $(seq 1 "${NUM_DEVICES}"); do
     # Create veth pair
     ip link add "${VETH_HOST}" type veth peer name "${VETH_PEER}" 2>/dev/null || true
 
-    # Move peer into namespace
-    ip link set "${VETH_PEER}" netns "${NS}"
+    # Move peer into namespace (skip if already moved on a previous run)
+    if ! ip netns exec "${NS}" ip link show "${VETH_PEER}" &>/dev/null; then
+        ip link set "${VETH_PEER}" netns "${NS}" || true
+    fi
 
     # Configure host side
     ip link set "${VETH_HOST}" master br-iot

@@ -16,10 +16,14 @@ export function formatBytes(bytes: number): string {
 }
 
 export function formatDataRate(kbps: number): string {
+  if (!Number.isFinite(kbps) || kbps < 0) return "0.0 KB/s";
   if (kbps >= 1024) return `${(kbps / 1024).toFixed(1)} MB/s`;
   return `${kbps.toFixed(1)} KB/s`;
 }
 
 export function formatTimestamp(iso: string): string {
-  return new Date(iso).toLocaleString();
+  if (!iso) return "-";
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return "-";
+  return date.toLocaleString();
 }
