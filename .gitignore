@@ -1,0 +1,53 @@
+# LLM / AI agent artifacts
+.agent/
+.claude/
+CLAUDE.md
+AGENTS.md
+.cursorrules
+.cursorignore
+.aider*
+.copilot/
+*.prompt
+*.llm-context
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Environment
+.env
+.env.*
+.env.example
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Packet captures
+*.pcap
+pcaps/
+
+# Logs
+*.log
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
