@@ -15,7 +15,7 @@ async def get_traffic_history(
     device_id: Optional[int] = None,
 ) -> list[TrafficHistoryResponse]:
     """Return per-device traffic rate history for the past N days."""
-    async with await get_db() as db:
+    async with get_db() as db:
         if device_id is not None:
             device_ids_rows = await db.execute_fetchall(
                 "SELECT id FROM devices WHERE id = ?", (device_id,)
@@ -48,7 +48,7 @@ async def get_traffic_history(
 async def get_system_logs(page: int = 1, limit: int = 20) -> dict:
     """Return paginated IPS alerts as a proxy for system activity."""
     offset = (page - 1) * limit
-    async with await get_db() as db:
+    async with get_db() as db:
         total_row = await db.execute_fetchall("SELECT COUNT(*) AS cnt FROM ips_alerts")
         total = total_row[0]["cnt"]
         rows = await db.execute_fetchall(
@@ -66,7 +66,7 @@ async def get_system_logs(page: int = 1, limit: int = 20) -> dict:
 async def purge_old_logs() -> LogPurgeResponse:
     """Delete traffic history and IPS alert records older than the retention period."""
     retention = settings.log_retention_days
-    async with await get_db() as db:
+    async with get_db() as db:
         c1 = await db.execute(
             "DELETE FROM traffic_history WHERE recorded_at < datetime('now', ? || ' days')",
             (f"-{retention}",),

@@ -17,7 +17,7 @@ _IP_RE = re.compile(r"\d{1,3}(\.\d{1,3}){3}")
 
 async def get_all_devices() -> list[DeviceResponse]:
     """Return all devices stored in the database."""
-    async with await get_db() as db:
+    async with get_db() as db:
         rows = await db.execute_fetchall("SELECT * FROM devices ORDER BY id")
         return [DeviceResponse(**dict(row)) for row in rows]
 
@@ -28,7 +28,7 @@ async def scan_network() -> list[DeviceResponse]:
     Requires root — arp-scan or parsing /proc/net/arp on the CentOS VM.
     """
     raw_entries = await asyncio.to_thread(_read_arp_table)
-    async with await get_db() as db:
+    async with get_db() as db:
         for mac, ip in raw_entries:
             vendor = _lookup_vendor(mac)
             await db.execute(
@@ -45,7 +45,7 @@ async def scan_network() -> list[DeviceResponse]:
 
 async def update_device(device_id: int, patch: DeviceUpdate) -> Optional[DeviceResponse]:
     """Update editable metadata fields for a device. Returns None if not found."""
-    async with await get_db() as db:
+    async with get_db() as db:
         row = await db.execute_fetchall("SELECT id FROM devices WHERE id = ?", (device_id,))
         if not row:
             return None
