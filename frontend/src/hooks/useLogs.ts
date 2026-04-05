@@ -4,7 +4,9 @@ import type { PaginatedResponse, TrafficHistory } from "@/types";
 
 export function useLogs() {
   const [traffic, setTraffic] = useState<TrafficHistory[]>([]);
-  const [systemLogs, setSystemLogs] = useState<PaginatedResponse<Record<string, unknown>> | null>(null);
+  const [systemLogs, setSystemLogs] = useState<PaginatedResponse<
+    Record<string, unknown>
+  > | null>(null);
   const [days, setDays] = useState(7);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,12 +21,14 @@ export function useLogs() {
         const data = await api.get<TrafficHistory[]>(`/logs/traffic?${params}`);
         setTraffic(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load traffic history");
+        setError(
+          err instanceof Error ? err.message : "Failed to load traffic history",
+        );
       } finally {
         setIsLoading(false);
       }
     },
-    [days]
+    [days],
   );
 
   const fetchSystemLogs = useCallback(async (page = 1) => {
@@ -32,11 +36,13 @@ export function useLogs() {
       setIsLoading(true);
       setError(null);
       const data = await api.get<PaginatedResponse<Record<string, unknown>>>(
-        `/logs/system?page=${page}&limit=20`
+        `/logs/system?page=${page}&limit=20`,
       );
       setSystemLogs(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load system logs");
+      setError(
+        err instanceof Error ? err.message : "Failed to load system logs",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -44,11 +50,15 @@ export function useLogs() {
 
   const purge = useCallback(async () => {
     try {
+      setIsLoading(true);
+      setError(null);
       await api.delete("/logs/purge");
       setTraffic([]);
       setSystemLogs(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Purge failed");
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 

@@ -49,7 +49,8 @@ IoT Security Gateway (Virtualized Smart Router)
    Runs inside the main CentOS VM. It performs routing, firewall filtering, traffic monitoring, and packet capture.
    iii. Backend API:
    Built with FastAPI. Exposes REST endpoints for device listing, rule configuration, packet capture control, and log
-   access.iv. Web Dashboard:
+   access.
+   iv. Web Dashboard:
    React-based interface used by the administrator to manage devices, configure policies, and view logs.
    All components run within a single VM environment, which simplifies deployment and testing while maintaining
    realistic networking behavior.
@@ -92,7 +93,7 @@ IoT Security Gateway (Virtualized Smart Router)
    device visibility, traffic control, anomaly detection, and log management. The virtualized approach ensures
    feasibility within the course timeline while maintaining realistic networking behavior and strong security
    relevance.
-   ---git repository link: “<https://github.com/OladipoOmotosho/Virtualized_Smart_Router.git”>
+   ---git repository link: [Virtualized Smart Router](https://github.com/OladipoOmotosho/Virtualized_Smart_Router.git)
 
 Project Timeline
 

@@ -22,10 +22,13 @@ export function useFirewall() {
 
   const addRule = useCallback(async (rule: FirewallRuleCreate) => {
     try {
+      setError(null);
       const created = await api.post<FirewallRule>("/firewall/rules", rule);
       setRules((prev) => [...prev, created]);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add rule");
+      return false;
     }
   }, []);
 
@@ -50,5 +53,13 @@ export function useFirewall() {
     }
   }, []);
 
-  return { rules, isLoading, error, fetchRules, addRule, deleteRule, applyRules };
+  return {
+    rules,
+    isLoading,
+    error,
+    fetchRules,
+    addRule,
+    deleteRule,
+    applyRules,
+  };
 }

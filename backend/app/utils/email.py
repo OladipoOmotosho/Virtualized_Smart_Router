@@ -29,7 +29,7 @@ def send_alert(device_ip: str, measured_rate: float, threshold: float) -> None:
     msg["To"] = settings.alert_recipient
 
     try:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as smtp:
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=settings.smtp_timeout) as smtp:
             smtp.starttls()
             smtp.login(settings.smtp_user, settings.smtp_password)
             smtp.send_message(msg)

@@ -35,10 +35,13 @@ export function useDevices() {
 
   const updateDevice = useCallback(async (id: number, patch: DeviceUpdate) => {
     try {
+      setError(null);
       const updated = await api.patch<Device>(`/devices/${id}`, patch);
       setDevices((prev) => prev.map((d) => (d.id === id ? updated : d)));
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Update failed");
+      return false;
     }
   }, []);
 

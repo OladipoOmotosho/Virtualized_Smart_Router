@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
+    smtp_timeout: int = 10
     alert_recipient: str = ""
 
     db_path: str = "gateway.db"
