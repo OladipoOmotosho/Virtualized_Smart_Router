@@ -9,6 +9,8 @@ AGENTS.md
 .copilot/
 *.prompt
 *.llm-context
+task.md
+walkthrough.md
 
 # Python
 __pycache__/
