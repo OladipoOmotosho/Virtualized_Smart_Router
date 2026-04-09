@@ -176,12 +176,16 @@ def _read_proc_net_dev() -> dict[str, int]:
 def _interface_to_device_id(iface: str, devices_by_ip: dict[str, int]) -> int | None:
     """Map a network interface name to a device ID.
 
-    Convention: namespace veth interfaces are named veth<device_id> (e.g. veth3).
-    Adjust this mapping to match your namespace setup script.
+    Convention: namespace veth interfaces are named veth<N> where N corresponds
+    to the namespace device IP 10.0.0.<N+1>. Returns None unless the resolved
+    device ID is actually present in the devices table — otherwise an FK
+    insert into traffic_history would fail before any scan has populated devices.
     """
-    if iface.startswith("veth"):
-        try:
-            return int(iface[4:])
-        except ValueError:
-            pass
-    return None
+    if not iface.startswith("veth"):
+        return None
+    try:
+        suffix = int(iface[4:])
+    except ValueError:
+        return None
+    expected_ip = f"10.0.0.{suffix + 1}"
+    return devices_by_ip.get(expected_ip)
