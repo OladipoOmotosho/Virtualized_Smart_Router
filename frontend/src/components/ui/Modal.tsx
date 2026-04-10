@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,10 @@ export function Modal({
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const stableOnClose = useCallback(() => onCloseRef.current(), []);
 
   useEffect(() => {
     if (!open) return;
@@ -52,7 +56,7 @@ export function Modal({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        stableOnClose();
         return;
       }
 
@@ -93,7 +97,7 @@ export function Modal({
       document.removeEventListener("keydown", handleKeyDown);
       previouslyFocusedElementRef.current?.focus();
     };
-  }, [open, onClose]);
+  }, [open, stableOnClose]);
 
   if (!open) return null;
 
