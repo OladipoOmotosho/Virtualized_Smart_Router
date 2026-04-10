@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Play, Square, Trash2 } from "lucide-react";
 import { useCapture } from "@/hooks/useCapture";
 import { useDevices } from "@/hooks/useDevices";
@@ -26,6 +26,8 @@ export default function CapturePage() {
   >(null);
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
   const [duration, setDuration] = useState("");
+  const refreshTimeoutIdsRef = useRef<number[]>([]);
+  const autoStopTimeoutByDeviceRef = useRef<Map<number, number>>(new Map());
 
   const ringRadius = 28;
   const ringCircumference = 2 * Math.PI * ringRadius;
@@ -42,6 +44,20 @@ export default function CapturePage() {
     fetchDevices();
     fetchFiles();
   }, [fetchDevices, fetchFiles]);
+
+  useEffect(() => {
+    return () => {
+      refreshTimeoutIdsRef.current.forEach((timeoutId) => {
+        window.clearTimeout(timeoutId);
+      });
+      refreshTimeoutIdsRef.current = [];
+
+      autoStopTimeoutByDeviceRef.current.forEach((timeoutId) => {
+        window.clearTimeout(timeoutId);
+      });
+      autoStopTimeoutByDeviceRef.current.clear();
+    };
+  }, []);
 
   useEffect(() => {
     if (!captureEndsAtMs || activeIds.length === 0) {
@@ -83,28 +99,37 @@ export default function CapturePage() {
       });
       setActiveIds((prev) => [...new Set([...prev, ...selectedIds])]);
       // Delay file refresh so tcpdump writes the pcap header first
-      setTimeout(() => fetchFiles(), 1500);
+      const refreshTimeoutId = window.setTimeout(() => fetchFiles(), 1500);
+      refreshTimeoutIdsRef.current.push(refreshTimeoutId);
 
       if (parsedDuration && parsedDuration > 0) {
         setCaptureEndsAtMs(Date.now() + parsedDuration * 1000);
         setCaptureDurationSeconds(parsedDuration);
         setCountdownSeconds(parsedDuration);
 
-        // If duration is set, auto-clear active state when it expires
-        const ids = [...selectedIds];
-        setTimeout(
-          () => {
+        // If duration is set, auto-clear active state per device when it expires.
+        selectedIds.forEach((id) => {
+          const existingTimeoutId = autoStopTimeoutByDeviceRef.current.get(id);
+          if (existingTimeoutId !== undefined) {
+            window.clearTimeout(existingTimeoutId);
+          }
+
+          const autoStopTimeoutId = window.setTimeout(() => {
+            autoStopTimeoutByDeviceRef.current.delete(id);
             setActiveIds((prev) => {
-              const next = prev.filter((id) => !ids.includes(id));
+              const next = prev.filter((activeId) => activeId !== id);
               if (next.length === 0) {
+                setCaptureEndsAtMs(null);
                 setCaptureDurationSeconds(null);
+                setCountdownSeconds(null);
               }
               return next;
             });
             fetchFiles();
-          },
-          parsedDuration * 1000 + 1500,
-        );
+          }, parsedDuration * 1000 + 1500);
+
+          autoStopTimeoutByDeviceRef.current.set(id, autoStopTimeoutId);
+        });
       } else {
         setCaptureEndsAtMs(null);
         setCaptureDurationSeconds(null);
@@ -118,6 +143,12 @@ export default function CapturePage() {
   async function handleStop(deviceId: number) {
     try {
       await stopCapture(deviceId);
+      const autoStopTimeoutId = autoStopTimeoutByDeviceRef.current.get(deviceId);
+      if (autoStopTimeoutId !== undefined) {
+        window.clearTimeout(autoStopTimeoutId);
+        autoStopTimeoutByDeviceRef.current.delete(deviceId);
+      }
+
       setActiveIds((prev) => {
         const next = prev.filter((id) => id !== deviceId);
         if (next.length === 0) {
@@ -128,7 +159,8 @@ export default function CapturePage() {
         return next;
       });
       // Delay so final packets are flushed to the pcap file
-      setTimeout(() => fetchFiles(), 1000);
+      const refreshTimeoutId = window.setTimeout(() => fetchFiles(), 1000);
+      refreshTimeoutIdsRef.current.push(refreshTimeoutId);
     } catch {
       // Keep the device active in UI when stop fails; useCapture already stores the error message.
     }
@@ -185,6 +217,19 @@ export default function CapturePage() {
                 ? `Auto-stop in ${countdownSeconds}s`
                 : "Capture running with no timer."}
             </p>
+
+            <div className="mb-5 rounded-lg border border-blue-100 bg-blue-50/70 p-3 text-left">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 mb-2">
+                Active Captures
+              </p>
+              <ul className="space-y-1.5">
+                {activeIds.map((id) => (
+                  <li key={`status-${id}`} className="text-sm text-blue-900">
+                    Capturing {devices.find((d) => d.id === id)?.name ?? `Device #${id}`} (device #{id})
+                  </li>
+                ))}
+              </ul>
+            </div>
 
             <div className="flex flex-wrap justify-center gap-2">
               {activeIds.map((id) => (
