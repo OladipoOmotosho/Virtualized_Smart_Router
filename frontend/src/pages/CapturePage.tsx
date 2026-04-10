@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Play, Square, Trash2 } from "lucide-react";
+import { LoaderCircle, Play, Square, Trash2 } from "lucide-react";
 import { useCapture } from "@/hooks/useCapture";
 import { useDevices } from "@/hooks/useDevices";
 import { Button } from "@/components/ui/Button";
@@ -20,12 +20,51 @@ export default function CapturePage() {
   const { devices, fetchDevices } = useDevices();
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [activeIds, setActiveIds] = useState<number[]>([]);
+  const [captureEndsAtMs, setCaptureEndsAtMs] = useState<number | null>(null);
+  const [captureDurationSeconds, setCaptureDurationSeconds] = useState<
+    number | null
+  >(null);
+  const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
   const [duration, setDuration] = useState("");
+
+  const ringRadius = 28;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const hasCountdown =
+    countdownSeconds !== null &&
+    captureDurationSeconds !== null &&
+    captureDurationSeconds > 0;
+  const countdownProgress = hasCountdown
+    ? Math.max(0, Math.min(1, countdownSeconds / captureDurationSeconds))
+    : 0;
+  const ringDashOffset = ringCircumference * (1 - countdownProgress);
 
   useEffect(() => {
     fetchDevices();
     fetchFiles();
   }, [fetchDevices, fetchFiles]);
+
+  useEffect(() => {
+    if (!captureEndsAtMs || activeIds.length === 0) {
+      setCountdownSeconds(null);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const secondsRemaining = Math.max(
+        0,
+        Math.ceil((captureEndsAtMs - Date.now()) / 1000),
+      );
+      setCountdownSeconds(secondsRemaining);
+      if (secondsRemaining === 0) {
+        setCaptureEndsAtMs(null);
+      }
+    };
+
+    updateCountdown();
+    const timerId = window.setInterval(updateCountdown, 1000);
+
+    return () => window.clearInterval(timerId);
+  }, [captureEndsAtMs, activeIds.length]);
 
   function toggleDevice(id: number) {
     setSelectedIds((prev) =>
@@ -35,33 +74,134 @@ export default function CapturePage() {
 
   async function handleStart() {
     if (!selectedIds.length) return;
-    await startCapture({
-      device_ids: selectedIds,
-      duration: duration ? Number(duration) : undefined,
-    });
-    setActiveIds((prev) => [...new Set([...prev, ...selectedIds])]);
-    // Delay file refresh so tcpdump writes the pcap header first
-    setTimeout(() => fetchFiles(), 1500);
+    const parsedDuration = duration ? Number(duration) : undefined;
 
-    // If duration is set, auto-clear active state when it expires
-    if (duration) {
-      const ids = [...selectedIds];
-      setTimeout(() => {
-        setActiveIds((prev) => prev.filter((id) => !ids.includes(id)));
-        fetchFiles();
-      }, Number(duration) * 1000 + 1500);
+    try {
+      await startCapture({
+        device_ids: selectedIds,
+        duration: parsedDuration,
+      });
+      setActiveIds((prev) => [...new Set([...prev, ...selectedIds])]);
+      // Delay file refresh so tcpdump writes the pcap header first
+      setTimeout(() => fetchFiles(), 1500);
+
+      if (parsedDuration && parsedDuration > 0) {
+        setCaptureEndsAtMs(Date.now() + parsedDuration * 1000);
+        setCaptureDurationSeconds(parsedDuration);
+        setCountdownSeconds(parsedDuration);
+
+        // If duration is set, auto-clear active state when it expires
+        const ids = [...selectedIds];
+        setTimeout(
+          () => {
+            setActiveIds((prev) => {
+              const next = prev.filter((id) => !ids.includes(id));
+              if (next.length === 0) {
+                setCaptureDurationSeconds(null);
+              }
+              return next;
+            });
+            fetchFiles();
+          },
+          parsedDuration * 1000 + 1500,
+        );
+      } else {
+        setCaptureEndsAtMs(null);
+        setCaptureDurationSeconds(null);
+        setCountdownSeconds(null);
+      }
+    } catch {
+      // useCapture surfaces start errors; keep local active state unchanged.
     }
   }
 
   async function handleStop(deviceId: number) {
-    await stopCapture(deviceId);
-    setActiveIds((prev) => prev.filter((id) => id !== deviceId));
-    // Delay so final packets are flushed to the pcap file
-    setTimeout(() => fetchFiles(), 1000);
+    try {
+      await stopCapture(deviceId);
+      setActiveIds((prev) => {
+        const next = prev.filter((id) => id !== deviceId);
+        if (next.length === 0) {
+          setCaptureEndsAtMs(null);
+          setCaptureDurationSeconds(null);
+          setCountdownSeconds(null);
+        }
+        return next;
+      });
+      // Delay so final packets are flushed to the pcap file
+      setTimeout(() => fetchFiles(), 1000);
+    } catch {
+      // Keep the device active in UI when stop fails; useCapture already stores the error message.
+    }
   }
 
   return (
     <div>
+      {activeIds.length > 0 && (
+        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-2xl border border-gray-200 shadow-2xl p-6 text-center">
+            <LoaderCircle
+              size={40}
+              className="mx-auto mb-4 text-blue-600 animate-spin"
+            />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Capturing traffic...
+            </h2>
+            {hasCountdown && (
+              <div className="mb-3 flex justify-center">
+                <div className="relative h-16 w-16">
+                  <svg
+                    className="h-16 w-16 -rotate-90"
+                    viewBox="0 0 64 64"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r={ringRadius}
+                      fill="none"
+                      stroke="#e5e7eb"
+                      strokeWidth="5"
+                    />
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r={ringRadius}
+                      fill="none"
+                      stroke="#2563eb"
+                      strokeWidth="5"
+                      strokeLinecap="round"
+                      strokeDasharray={ringCircumference}
+                      strokeDashoffset={ringDashOffset}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-blue-700">
+                    {countdownSeconds}s
+                  </div>
+                </div>
+              </div>
+            )}
+            <p className="text-sm text-gray-600 mb-5">
+              {countdownSeconds !== null
+                ? `Auto-stop in ${countdownSeconds}s`
+                : "Capture running with no timer."}
+            </p>
+
+            <div className="flex flex-wrap justify-center gap-2">
+              {activeIds.map((id) => (
+                <Button
+                  key={id}
+                  variant="danger"
+                  onClick={() => handleStop(id)}
+                >
+                  <Square size={14} /> Stop{" "}
+                  {devices.find((d) => d.id === id)?.name ?? `#${id}`}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Packet Capture</h1>
 
       {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
