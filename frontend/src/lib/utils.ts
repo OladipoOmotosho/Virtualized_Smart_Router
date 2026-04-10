@@ -23,7 +23,10 @@ export function formatDataRate(kbps: number): string {
 
 export function formatTimestamp(iso: string): string {
   if (!iso) return "-";
-  const date = new Date(iso);
+  // SQLite datetime('now') stores UTC without a suffix — append Z so the
+  // browser converts to the user's local timezone.
+  const normalized = iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z";
+  const date = new Date(normalized);
   if (isNaN(date.getTime())) return "-";
   return date.toLocaleString();
 }
