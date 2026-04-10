@@ -19,6 +19,7 @@ export default function CapturePage() {
   } = useCapture();
   const { devices, fetchDevices } = useDevices();
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [activeIds, setActiveIds] = useState<number[]>([]);
   const [duration, setDuration] = useState("");
 
   useEffect(() => {
@@ -38,7 +39,25 @@ export default function CapturePage() {
       device_ids: selectedIds,
       duration: duration ? Number(duration) : undefined,
     });
-    await fetchFiles();
+    setActiveIds((prev) => [...new Set([...prev, ...selectedIds])]);
+    // Delay file refresh so tcpdump writes the pcap header first
+    setTimeout(() => fetchFiles(), 1500);
+
+    // If duration is set, auto-clear active state when it expires
+    if (duration) {
+      const ids = [...selectedIds];
+      setTimeout(() => {
+        setActiveIds((prev) => prev.filter((id) => !ids.includes(id)));
+        fetchFiles();
+      }, Number(duration) * 1000 + 1500);
+    }
+  }
+
+  async function handleStop(deviceId: number) {
+    await stopCapture(deviceId);
+    setActiveIds((prev) => prev.filter((id) => id !== deviceId));
+    // Delay so final packets are flushed to the pcap file
+    setTimeout(() => fetchFiles(), 1000);
   }
 
   return (
@@ -88,8 +107,8 @@ export default function CapturePage() {
           >
             <Play size={14} /> Start Capture
           </Button>
-          {selectedIds.map((id) => (
-            <Button key={id} variant="danger" onClick={() => stopCapture(id)}>
+          {activeIds.map((id) => (
+            <Button key={id} variant="danger" onClick={() => handleStop(id)}>
               <Square size={14} /> Stop{" "}
               {devices.find((d) => d.id === id)?.name ?? `#${id}`}
             </Button>
