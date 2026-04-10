@@ -114,19 +114,22 @@ export default function CapturePage() {
             window.clearTimeout(existingTimeoutId);
           }
 
-          const autoStopTimeoutId = window.setTimeout(() => {
-            autoStopTimeoutByDeviceRef.current.delete(id);
-            setActiveIds((prev) => {
-              const next = prev.filter((activeId) => activeId !== id);
-              if (next.length === 0) {
-                setCaptureEndsAtMs(null);
-                setCaptureDurationSeconds(null);
-                setCountdownSeconds(null);
-              }
-              return next;
-            });
-            fetchFiles();
-          }, parsedDuration * 1000 + 1500);
+          const autoStopTimeoutId = window.setTimeout(
+            () => {
+              autoStopTimeoutByDeviceRef.current.delete(id);
+              setActiveIds((prev) => {
+                const next = prev.filter((activeId) => activeId !== id);
+                if (next.length === 0) {
+                  setCaptureEndsAtMs(null);
+                  setCaptureDurationSeconds(null);
+                  setCountdownSeconds(null);
+                }
+                return next;
+              });
+              fetchFiles();
+            },
+            parsedDuration * 1000 + 1500,
+          );
 
           autoStopTimeoutByDeviceRef.current.set(id, autoStopTimeoutId);
         });
@@ -143,7 +146,8 @@ export default function CapturePage() {
   async function handleStop(deviceId: number) {
     try {
       await stopCapture(deviceId);
-      const autoStopTimeoutId = autoStopTimeoutByDeviceRef.current.get(deviceId);
+      const autoStopTimeoutId =
+        autoStopTimeoutByDeviceRef.current.get(deviceId);
       if (autoStopTimeoutId !== undefined) {
         window.clearTimeout(autoStopTimeoutId);
         autoStopTimeoutByDeviceRef.current.delete(deviceId);
@@ -225,7 +229,9 @@ export default function CapturePage() {
               <ul className="space-y-1.5">
                 {activeIds.map((id) => (
                   <li key={`status-${id}`} className="text-sm text-blue-900">
-                    Capturing {devices.find((d) => d.id === id)?.name ?? `Device #${id}`} (device #{id})
+                    Capturing{" "}
+                    {devices.find((d) => d.id === id)?.name ?? `Device #${id}`}{" "}
+                    (device #{id})
                   </li>
                 ))}
               </ul>
