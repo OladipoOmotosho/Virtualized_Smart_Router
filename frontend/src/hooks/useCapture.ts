@@ -12,10 +12,14 @@ export function useCapture() {
     try {
       setIsLoading(true);
       setError(null);
-      const started = await api.post<CaptureSession[]>("/packet-capture/start", req);
+      const started = await api.post<CaptureSession[]>(
+        "/packet-capture/start",
+        req,
+      );
       setSessions((prev) => [...prev, ...started]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start capture");
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -23,16 +27,18 @@ export function useCapture() {
 
   const stopCapture = useCallback(async (deviceId: number) => {
     try {
+      setError(null);
       await api.post("/packet-capture/stop", { device_id: deviceId });
       setSessions((prev) =>
         prev.map((s) =>
           s.device_id === deviceId && !s.stopped_at
             ? { ...s, stopped_at: new Date().toISOString() }
-            : s
-        )
+            : s,
+        ),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to stop capture");
+      throw err;
     }
   }, []);
 
@@ -58,5 +64,14 @@ export function useCapture() {
     }
   }, []);
 
-  return { sessions, files, isLoading, error, startCapture, stopCapture, fetchFiles, deleteFile };
+  return {
+    sessions,
+    files,
+    isLoading,
+    error,
+    startCapture,
+    stopCapture,
+    fetchFiles,
+    deleteFile,
+  };
 }
