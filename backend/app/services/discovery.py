@@ -1,9 +1,11 @@
 """Device discovery: ARP scan, DHCP lease parsing, MAC OUI vendor lookup."""
 
 import asyncio
+import csv
 import ipaddress
 import logging
 import re
+from pathlib import Path
 from typing import Optional
 
 from app.database import get_db
@@ -13,6 +15,33 @@ from app.utils import shell
 logger = logging.getLogger(__name__)
 
 _MAC_RE = re.compile(r"([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}")
+_OUI_DB: dict[str, str] = {}
+
+
+def _load_oui_db() -> None:
+    """Load the IEEE OUI CSV into an in-memory dict (prefix → vendor).
+
+    Expected format (IEEE MA-L export):
+        Registry,Assignment,Organization Name,Organization Address
+        MA-L,286FB9,Nokia Shanghai Bell Co. Ltd.,...
+    """
+    if _OUI_DB:
+        return
+    oui_path = Path(__file__).resolve().parent.parent / "data" / "oui_full.csv"
+    if not oui_path.exists():
+        logger.warning("OUI database not found at %s", oui_path)
+        return
+    with open(oui_path, newline="", encoding="utf-8") as f:
+        reader = csv.reader(f)
+        next(reader, None)  # skip header row
+        for row in reader:
+            if len(row) < 3:
+                continue
+            prefix = row[1].upper().strip()
+            vendor = row[2].strip().strip('"')
+            if prefix and vendor:
+                _OUI_DB[prefix] = vendor
+    logger.info("Loaded %d OUI entries", len(_OUI_DB))
 
 
 async def get_all_devices() -> list[DeviceResponse]:
@@ -35,7 +64,7 @@ async def scan_network() -> list[DeviceResponse]:
                 """
                 INSERT INTO devices (mac, ip, vendor)
                 VALUES (?, ?, ?)
-                ON CONFLICT(mac) DO UPDATE SET ip=excluded.ip, updated_at=datetime('now')
+                ON CONFLICT(mac) DO UPDATE SET ip=excluded.ip, vendor=excluded.vendor, updated_at=datetime('now')
                 """,
                 (mac, ip, vendor),
             )
@@ -86,7 +115,19 @@ def _read_arp_table() -> list[tuple[str, str]]:
 
 
 def _lookup_vendor(mac: str) -> Optional[str]:
-    """Return vendor string from MAC OUI prefix, or None if unknown."""
-    oui = mac.upper().replace(":", "")[:6]
-    # TODO: load a local OUI database (e.g. IEEE oui.txt) and do a dict lookup
-    return None
+    """Return vendor string from MAC OUI prefix, or None if unknown.
+
+    Locally-administered MACs (bit 1 of the first octet is set) are generated
+    by Linux for veth pairs and network namespaces — label them accordingly.
+    """
+    _load_oui_db()
+    raw = mac.upper().replace(":", "").replace("-", "")
+    oui = raw[:6]
+
+    # Check for locally-administered MAC (second hex char is 2,3,6,7,A,B,E,F)
+    if len(raw) >= 2:
+        second_nibble = int(raw[1], 16)
+        if second_nibble & 0x2:  # LA bit is set
+            return "Local (virtual/namespace)"
+
+    return _OUI_DB.get(oui)
