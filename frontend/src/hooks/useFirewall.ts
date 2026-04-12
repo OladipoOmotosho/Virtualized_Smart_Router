@@ -36,8 +36,10 @@ export function useFirewall() {
     try {
       await api.delete(`/firewall/rules/${id}`);
       setRules((prev) => prev.filter((r) => r.id !== id));
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete rule");
+      return false;
     }
   }, []);
 
@@ -46,8 +48,10 @@ export function useFirewall() {
       setIsLoading(true);
       setError(null);
       await api.post("/firewall/apply");
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to apply rules");
+      return false;
     } finally {
       setIsLoading(false);
     }

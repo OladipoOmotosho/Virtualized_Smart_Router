@@ -23,6 +23,7 @@ export default function FirewallPage() {
   } = useFirewall();
   const { devices, fetchDevices } = useDevices();
   const [showForm, setShowForm] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [form, setForm] = useState<FirewallRuleCreate>({
     device_id: 0,
     dest_ip: "",
@@ -47,6 +48,15 @@ export default function FirewallPage() {
       console.error(err);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleDelete(ruleId: number) {
+    setPendingDeleteId(ruleId);
+    try {
+      await deleteRule(ruleId);
+    } finally {
+      setPendingDeleteId(null);
     }
   }
 
@@ -112,8 +122,9 @@ export default function FirewallPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
-                      onClick={() => deleteRule(r.id)}
-                      className="text-red-400 hover:text-red-600"
+                      onClick={() => handleDelete(r.id)}
+                      disabled={pendingDeleteId === r.id}
+                      className="text-red-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                       aria-label="Delete rule"
                     >
                       <Trash2 size={15} />
