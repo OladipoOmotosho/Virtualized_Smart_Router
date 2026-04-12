@@ -3,6 +3,7 @@ import { LoaderCircle, Play, Square, Trash2 } from "lucide-react";
 import { useCapture } from "@/hooks/useCapture";
 import { useDevices } from "@/hooks/useDevices";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { Input } from "@/components/ui/Input";
 import { formatBytes, formatTimestamp } from "@/lib/utils";
@@ -26,6 +27,7 @@ export default function CapturePage() {
   >(null);
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
   const [duration, setDuration] = useState("");
+  const [packetCount, setPacketCount] = useState("");
   const refreshTimeoutIdsRef = useRef<number[]>([]);
   const autoStopTimeoutByDeviceRef = useRef<Map<number, number>>(new Map());
 
@@ -88,14 +90,23 @@ export default function CapturePage() {
     );
   }
 
+  function getDeviceLabel(id: number) {
+    return devices.find((device) => device.id === id)?.name ?? `Device #${id}`;
+  }
+
   async function handleStart() {
     if (!selectedIds.length) return;
     const parsedDuration = duration ? Number(duration) : undefined;
+    const parsedPacketCount = packetCount ? Number(packetCount) : undefined;
 
     try {
       await startCapture({
         device_ids: selectedIds,
         duration: parsedDuration,
+        packet_count:
+          parsedPacketCount && parsedPacketCount > 0
+            ? parsedPacketCount
+            : undefined,
       });
       setActiveIds((prev) => [...new Set([...prev, ...selectedIds])]);
       // Delay file refresh so tcpdump writes the pcap header first
@@ -138,6 +149,8 @@ export default function CapturePage() {
         setCaptureDurationSeconds(null);
         setCountdownSeconds(null);
       }
+
+      setPacketCount("");
     } catch {
       // useCapture surfaces start errors; keep local active state unchanged.
     }
@@ -230,7 +243,7 @@ export default function CapturePage() {
                 {activeIds.map((id) => (
                   <li key={`status-${id}`} className="text-sm text-blue-900">
                     Capturing{" "}
-                    {devices.find((d) => d.id === id)?.name ?? `Device #${id}`}{" "}
+                    {getDeviceLabel(id)} {" "}
                     (device #{id})
                   </li>
                 ))}
@@ -244,8 +257,7 @@ export default function CapturePage() {
                   variant="danger"
                   onClick={() => handleStop(id)}
                 >
-                  <Square size={14} /> Stop{" "}
-                  {devices.find((d) => d.id === id)?.name ?? `#${id}`}
+                  <Square size={14} /> Stop {getDeviceLabel(id)}
                 </Button>
               ))}
             </div>
@@ -271,13 +283,25 @@ export default function CapturePage() {
                 <button
                   key={d.id}
                   onClick={() => toggleDevice(d.id)}
-                  className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
                     selectedIds.includes(d.id)
                       ? "bg-blue-600 text-white border-blue-600"
                       : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
                   }`}
                 >
-                  {d.name ?? d.ip}
+                  <span>{d.name ?? d.ip}</span>
+                  {activeIds.includes(d.id) && (
+                    <Badge
+                      variant={selectedIds.includes(d.id) ? "success" : "neutral"}
+                      className={
+                        selectedIds.includes(d.id)
+                          ? "bg-white/20 text-white"
+                          : "bg-blue-100 text-blue-700"
+                      }
+                    >
+                      Active
+                    </Badge>
+                  )}
                 </button>
               ))}
             </div>
@@ -288,6 +312,13 @@ export default function CapturePage() {
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
             placeholder="No limit"
+          />
+          <Input
+            label="Packet Count (optional)"
+            type="number"
+            value={packetCount}
+            onChange={(e) => setPacketCount(e.target.value)}
+            placeholder="Unlimited"
           />
         </div>
         <div className="flex gap-3">
