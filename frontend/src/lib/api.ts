@@ -1,5 +1,37 @@
 const BASE_URL = "/api";
 
+function formatErrorDetail(detail: unknown, status: number): string {
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        if (item && typeof item === "object") {
+          const record = item as Record<string, unknown>;
+          const location = Array.isArray(record.loc)
+            ? record.loc.join(".")
+            : null;
+          const message =
+            typeof record.msg === "string"
+              ? record.msg
+              : JSON.stringify(record);
+          return location ? `${location}: ${message}` : message;
+        }
+
+        return String(item);
+      })
+      .join("; ");
+  }
+
+  if (detail && typeof detail === "object") {
+    return JSON.stringify(detail);
+  }
+
+  return `HTTP ${status}`;
+}
+
 class ApiError extends Error {
   constructor(
     public status: number,
@@ -18,7 +50,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, body.detail ?? `HTTP ${res.status}`);
+    throw new ApiError(
+      res.status,
+      formatErrorDetail(body.detail, res.status),
+    );
   }
 
   // 204 No Content
