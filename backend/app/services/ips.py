@@ -84,6 +84,10 @@ async def _poll_devices() -> None:
         rows = await db.execute_fetchall("SELECT id, ip FROM devices")
         devices = {row["ip"]: row["id"] for row in rows}
 
+        veth_ifaces = {k: v for k, v in counters.items() if k.startswith("veth")}
+        if veth_ifaces:
+            logger.info("IPS poll: veth counters=%s devices_by_ip=%s", veth_ifaces, devices)
+
         now = time.monotonic()
 
         for iface, rx_bytes in counters.items():
