@@ -24,6 +24,7 @@ export default function FirewallPage() {
   const { devices, fetchDevices } = useDevices();
   const [showForm, setShowForm] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [form, setForm] = useState<FirewallRuleCreate>({
     device_id: 0,
     dest_ip: "",
@@ -51,12 +52,14 @@ export default function FirewallPage() {
     }
   }
 
-  async function handleDelete(ruleId: number) {
-    setPendingDeleteId(ruleId);
+  async function handleDelete() {
+    if (confirmDeleteId === null) return;
+    setPendingDeleteId(confirmDeleteId);
     try {
-      await deleteRule(ruleId);
+      await deleteRule(confirmDeleteId);
     } finally {
       setPendingDeleteId(null);
+      setConfirmDeleteId(null);
     }
   }
 
@@ -122,7 +125,7 @@ export default function FirewallPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
-                      onClick={() => handleDelete(r.id)}
+                      onClick={() => setConfirmDeleteId(r.id)}
                       disabled={pendingDeleteId === r.id}
                       className="text-red-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                       aria-label="Delete rule"
@@ -136,6 +139,31 @@ export default function FirewallPage() {
           </table>
         </div>
       )}
+
+      <Modal
+        open={confirmDeleteId !== null}
+        onClose={() => setConfirmDeleteId(null)}
+        title="Delete Rule"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Are you sure you want to delete this firewall rule? You will need to
+            click <strong>Apply Rules</strong> to update iptables after deletion.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setConfirmDeleteId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDelete}
+              loading={pendingDeleteId !== null}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         open={showForm}
