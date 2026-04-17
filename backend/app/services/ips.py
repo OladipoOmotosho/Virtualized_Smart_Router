@@ -19,10 +19,10 @@ _thresholds: dict[int, float] = {}
 _prev_counters: dict[int, tuple[int, float]] = {}
 
 # Default threshold if none is configured per device
-DEFAULT_THRESHOLD_KBPS: float = 500.0
+DEFAULT_THRESHOLD_KBPS: float = 10.0
 
 # How long (seconds) to temporarily block a device after an anomaly
-BLOCK_DURATION_SECONDS: int = 300
+BLOCK_DURATION_SECONDS: int = 30
 
 # Keep references to scheduled block-removal tasks so they are not garbage-collected.
 ACTIVE_BLOCK_TASKS: set[asyncio.Task[None]] = set()
