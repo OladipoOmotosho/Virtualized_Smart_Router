@@ -18,6 +18,7 @@ class DeviceBase(BaseModel):
 class DeviceCreate(DeviceBase):
     mac: str = Field(..., description="MAC address (aa:bb:cc:dd:ee:ff, case-insensitive)")
     ip: str = Field(..., description="IPv4 address")
+    ipv6: Optional[str] = Field(None, description="IPv6 address (if available)")
     vendor: Optional[str] = Field(None, description="Vendor from MAC OUI lookup")
 
     @field_validator("mac")
@@ -36,6 +37,16 @@ class DeviceCreate(DeviceBase):
             return str(ipaddress.IPv4Address(value))
         except ValueError as exc:
             raise ValueError("Invalid IPv4 address") from exc
+
+    @field_validator("ipv6")
+    @classmethod
+    def validate_ipv6(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or value == "":
+            return None
+        try:
+            return str(ipaddress.IPv6Address(value))
+        except ValueError as exc:
+            raise ValueError("Invalid IPv6 address") from exc
 
 
 class DeviceUpdate(DeviceBase):

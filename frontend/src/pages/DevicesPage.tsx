@@ -65,7 +65,7 @@ export default function DevicesPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {["Name", "IP", "MAC", "Vendor", "Last Seen", ""].map((h, idx) => (
+                {["Name", "IPv4", "IPv6", "MAC", "Vendor", "Last Seen", ""].map((h, idx) => (
                   <th
                     key={h || `header-${idx}`}
                     className="text-left px-4 py-3 font-medium text-gray-500"
@@ -82,7 +82,10 @@ export default function DevicesPage() {
                     {d.name ?? <span className="text-gray-400">Unnamed</span>}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-600">
-                    {d.ip}
+                    {d.ip || <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                    {d.ipv6 ?? <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-600">
                     {d.mac}
