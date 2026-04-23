@@ -89,23 +89,38 @@ export default function LogsPage() {
           <ResponsiveContainer width="100%" height={300}>
             <LineChart margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
               <XAxis
-                dataKey="recorded_at"
-                tickFormatter={(v: string) => new Date(v).toLocaleTimeString()}
+                dataKey="epoch"
+                type="number"
+                scale="time"
+                domain={["dataMin", "dataMax"]}
+                tickFormatter={(v: number) => new Date(v).toLocaleTimeString()}
               />
               <YAxis unit=" KB/s" />
-              <Tooltip labelFormatter={(v: string) => formatTimestamp(v)} />
+              <Tooltip labelFormatter={(v: number) => new Date(v).toLocaleString()} />
               <Legend />
-              {traffic.map((t, i) => (
-                <Line
-                  key={t.device_id}
-                  data={t.data}
-                  dataKey="rate_kbps"
-                  name={`Device #${t.device_id}`}
-                  stroke={COLORS[i % COLORS.length]}
-                  dot={false}
-                  type="monotone"
-                />
-              ))}
+              {traffic.map((t, i) => {
+                const sortedData = t.data
+                  .map((d) => ({
+                    ...d,
+                    epoch: new Date(
+                      d.recorded_at.endsWith("Z") || d.recorded_at.includes("+")
+                        ? d.recorded_at
+                        : d.recorded_at + "Z",
+                    ).getTime(),
+                  }))
+                  .sort((a, b) => a.epoch - b.epoch);
+                return (
+                  <Line
+                    key={t.device_id}
+                    data={sortedData}
+                    dataKey="rate_kbps"
+                    name={`Device #${t.device_id}`}
+                    stroke={COLORS[i % COLORS.length]}
+                    dot={false}
+                    type="monotone"
+                  />
+                );
+              })}
             </LineChart>
           </ResponsiveContainer>
         )}
