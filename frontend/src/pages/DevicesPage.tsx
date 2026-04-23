@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Trash2 } from "lucide-react";
 import { useDevices } from "@/hooks/useDevices";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -10,10 +10,22 @@ import type { Device, DeviceUpdate } from "@/types";
 import { formatTimestamp } from "@/lib/utils";
 
 export default function DevicesPage() {
-  const { devices, isLoading, fetchDevices, scanDevices, updateDevice } =
-    useDevices();
+  const {
+    devices,
+    isLoading,
+    fetchDevices,
+    scanDevices,
+    updateDevice,
+    deleteDevice,
+    deleteAllDevices,
+  } = useDevices();
   const [editing, setEditing] = useState<Device | null>(null);
   const [form, setForm] = useState<DeviceUpdate>({});
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmDeleteDevice, setConfirmDeleteDevice] = useState<Device | null>(
+    null,
+  );
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
 
   useEffect(() => {
     fetchDevices();
@@ -37,6 +49,23 @@ export default function DevicesPage() {
     }
   }
 
+  async function handleConfirmDelete() {
+    if (!confirmDeleteDevice) return;
+    setDeletingId(confirmDeleteDevice.id);
+    const ok = await deleteDevice(confirmDeleteDevice.id);
+    setDeletingId(null);
+    if (ok) {
+      setConfirmDeleteDevice(null);
+    }
+  }
+
+  async function handleConfirmClearAll() {
+    const ok = await deleteAllDevices();
+    if (ok) {
+      setConfirmClearAll(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -46,10 +75,22 @@ export default function DevicesPage() {
             Discovered IoT devices on the gateway network
           </p>
         </div>
-        <Button onClick={scanDevices} loading={isLoading} variant="primary">
-          <RefreshCw size={14} />
-          Scan Network
-        </Button>
+        <div className="flex gap-2">
+          {devices.length > 0 && (
+            <Button
+              variant="danger"
+              onClick={() => setConfirmClearAll(true)}
+              disabled={isLoading}
+            >
+              <Trash2 size={14} />
+              Clear All
+            </Button>
+          )}
+          <Button onClick={scanDevices} loading={isLoading} variant="primary">
+            <RefreshCw size={14} />
+            Scan Network
+          </Button>
+        </div>
       </div>
 
       {isLoading && !devices.length ? (
@@ -97,9 +138,19 @@ export default function DevicesPage() {
                     {formatTimestamp(d.updated_at)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Button variant="secondary" onClick={() => openEdit(d)}>
-                      Edit
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="secondary" onClick={() => openEdit(d)}>
+                        Edit
+                      </Button>
+                      <button
+                        onClick={() => setConfirmDeleteDevice(d)}
+                        disabled={deletingId === d.id}
+                        aria-label={`Delete ${d.name ?? d.ip}`}
+                        className="text-red-400 hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -140,6 +191,70 @@ export default function DevicesPage() {
             </Button>
             <Button onClick={handleSave}>Save</Button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!confirmDeleteDevice}
+        onClose={() => setConfirmDeleteDevice(null)}
+        title="Delete Device"
+      >
+        <p className="text-sm text-gray-600 mb-2">
+          Remove{" "}
+          <strong>
+            {confirmDeleteDevice?.name ?? confirmDeleteDevice?.ip}
+          </strong>{" "}
+          from the device list?
+        </p>
+        <p className="text-xs text-gray-500 mb-4">
+          Related firewall rules, captures, traffic history, and IPS alerts
+          for this device will also be removed. This cannot be undone.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => setConfirmDeleteDevice(null)}
+            disabled={deletingId !== null}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={handleConfirmDelete}
+            loading={deletingId !== null}
+          >
+            <Trash2 size={14} /> Delete
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={confirmClearAll}
+        onClose={() => setConfirmClearAll(false)}
+        title="Clear All Devices"
+      >
+        <p className="text-sm text-gray-600 mb-2">
+          This will remove <strong>every</strong> device in the list.
+        </p>
+        <p className="text-xs text-red-500 mb-4">
+          Warning: all firewall rules, captures, traffic history, and IPS
+          alerts will also be wiped. This cannot be undone.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => setConfirmClearAll(false)}
+            disabled={isLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={handleConfirmClearAll}
+            loading={isLoading}
+          >
+            <Trash2 size={14} /> Clear All
+          </Button>
         </div>
       </Modal>
     </div>
