@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  CartesianGrid,
 } from "recharts";
 import { useLogs } from "@/hooks/useLogs";
 import { Button } from "@/components/ui/Button";
@@ -86,18 +87,28 @@ export default function LogsPage() {
             No traffic data for this period.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart margin={{ top: 10, right: 24, left: 8, bottom: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis
                 dataKey="epoch"
                 type="number"
                 scale="time"
                 domain={["dataMin", "dataMax"]}
+                tickCount={8}
+                tick={{ fontSize: 11, fill: "#6b7280" }}
                 tickFormatter={(v: number) => new Date(v).toLocaleTimeString()}
+                padding={{ left: 12, right: 12 }}
               />
-              <YAxis unit=" KB/s" />
-              <Tooltip labelFormatter={(v: number) => new Date(v).toLocaleString()} />
-              <Legend />
+              <YAxis
+                tick={{ fontSize: 11, fill: "#6b7280" }}
+                label={{ value: "KB/s", angle: -90, position: "insideLeft", style: { fontSize: 12, fill: "#6b7280" } }}
+              />
+              <Tooltip
+                labelFormatter={(v: number) => new Date(v).toLocaleString()}
+                formatter={(v: number) => [`${Number(v).toFixed(1)} KB/s`, ""]}
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
               {traffic.map((t, i) => {
                 const sortedData = t.data
                   .map((d) => ({
@@ -116,7 +127,9 @@ export default function LogsPage() {
                     dataKey="rate_kbps"
                     name={`Device #${t.device_id}`}
                     stroke={COLORS[i % COLORS.length]}
-                    dot={false}
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
                     type="monotone"
                   />
                 );
