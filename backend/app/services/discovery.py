@@ -9,7 +9,12 @@ from pathlib import Path
 from typing import Optional
 
 from app.database import get_db
-from app.schemas.device import DeviceCreate, DeviceResponse, DeviceUpdate
+from app.schemas.device import (
+    DeviceCreate,
+    DeviceResponse,
+    DeviceUpdate,
+    ExternalDeviceEntry,
+)
 from app.utils import shell
 
 logger = logging.getLogger(__name__)
@@ -149,6 +154,55 @@ async def scan_network() -> list[DeviceResponse]:
 
         await db.commit()
     return await get_all_devices()
+
+
+async def external_scan(entries: list[ExternalDeviceEntry]) -> list[DeviceResponse]:
+    """Upsert devices reported by an external scanner (e.g. the host helper
+    that reads the Windows hotspot's ARP table). MAC is the join key."""
+    async with get_db() as db:
+        for e in entries:
+            mac = e.mac.lower().strip()
+            # Normalise MAC separators to colons
+            mac = mac.replace("-", ":")
+            if not _MAC_RE.fullmatch(mac):
+                logger.warning("Skipping invalid MAC from external scan: %s", e.mac)
+                continue
+            vendor = _lookup_vendor(mac)
+            default_name = e.hostname or _default_name_for(e.ip) or f"Hotspot {e.ip}"
+            await db.execute(
+                """
+                INSERT INTO devices (mac, ip, vendor, name)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(mac) DO UPDATE SET
+                    ip=excluded.ip,
+                    vendor=COALESCE(excluded.vendor, devices.vendor),
+                    name=COALESCE(devices.name, excluded.name),
+                    updated_at=datetime('now')
+                """,
+                (mac, e.ip, vendor, default_name),
+            )
+        await db.commit()
+    return await get_all_devices()
+
+
+async def delete_device(device_id: int) -> bool:
+    """Delete one device by id. Returns False if the row didn't exist."""
+    async with get_db() as db:
+        cursor = await db.execute("DELETE FROM devices WHERE id = ?", (device_id,))
+        await db.commit()
+        return cursor.rowcount > 0
+
+
+async def delete_all_devices() -> int:
+    """Delete every device row. Returns the number of rows removed.
+
+    Cascades to firewall_rules / capture_sessions / traffic_history / ips_alerts
+    via the schema's ON DELETE CASCADE foreign keys.
+    """
+    async with get_db() as db:
+        cursor = await db.execute("DELETE FROM devices")
+        await db.commit()
+        return cursor.rowcount
 
 
 async def update_device(device_id: int, patch: DeviceUpdate) -> Optional[DeviceResponse]:
