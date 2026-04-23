@@ -7,7 +7,9 @@ from typing import Any
 
 from app.config import settings
 from app.database import get_db
+from app.schemas.capture import CaptureStartRequest
 from app.schemas.logs import IpsAlertResponse
+from app.services import capture as capture_service
 from app.utils import email, shell
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,9 @@ DEFAULT_THRESHOLD_KBPS: float = 500.0
 
 # How long (seconds) to temporarily block a device after an anomaly
 BLOCK_DURATION_SECONDS: int = 300
+
+# Forensic capture duration when an anomaly fires
+ANOMALY_CAPTURE_SECONDS: int = 10
 
 # Keep references to scheduled block-removal tasks so they are not garbage-collected.
 ACTIVE_BLOCK_TASKS: set[asyncio.Task[None]] = set()
@@ -144,6 +149,15 @@ async def _handle_anomaly(device_id: int, rate_kbps: float, threshold: float) ->
 
     # Send email alert (non-blocking, errors are swallowed inside send_alert)
     await asyncio.to_thread(email.send_alert, device_ip, rate_kbps, threshold)
+
+    # Kick off a short forensic capture before applying the block so we record the burst
+    try:
+        await capture_service.start_capture(
+            CaptureStartRequest(device_ids=[device_id], duration=ANOMALY_CAPTURE_SECONDS)
+        )
+        logger.info("Forensic capture started for device %d (%ds)", device_id, ANOMALY_CAPTURE_SECONDS)
+    except Exception:
+        logger.exception("Failed to start forensic capture for device %d", device_id)
 
     # Apply temporary DROP rule
     await shell.run_async(["iptables", "-I", "FORWARD", "1", "-s", device_ip, "-j", "DROP"], check=False)
