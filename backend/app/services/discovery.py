@@ -97,6 +97,22 @@ async def scan_network() -> list[DeviceResponse]:
                     """,
                     (mac, ipv4, ipv6, vendor),
                 )
+
+        # Backfill: rows that were stored before the OUI DB loaded (or before
+        # the LA-bit rule existed) can still carry vendor=NULL even if the
+        # lookup would succeed today. Re-run it for every unresolved row,
+        # independent of whether the device answered this scan.
+        unresolved = await db.execute_fetchall(
+            "SELECT id, mac FROM devices WHERE vendor IS NULL OR vendor = ''"
+        )
+        for row in unresolved:
+            refreshed = _lookup_vendor(row["mac"])
+            if refreshed is not None:
+                await db.execute(
+                    "UPDATE devices SET vendor=? WHERE id=?",
+                    (refreshed, row["id"]),
+                )
+
         await db.commit()
     return await get_all_devices()
 
