@@ -64,3 +64,20 @@ class DeviceResponse(DeviceCreate):
     updated_at: str
 
     model_config = {"from_attributes": True}
+
+
+class ExternalDeviceEntry(BaseModel):
+    """Single device reported by an external scanner (e.g. the Windows host helper)."""
+    mac: str
+    ip: str
+    hostname: Optional[str] = None
+
+
+class ExternalScanRequest(BaseModel):
+    """Payload sent by the host-side discovery script to seed hotspot devices."""
+    devices: list[ExternalDeviceEntry]
+
+
+class BulkDeleteResponse(BaseModel):
+    deleted_count: int
+    message: str

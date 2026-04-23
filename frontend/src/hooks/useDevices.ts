@@ -46,5 +46,47 @@ export function useDevices() {
     [toast],
   );
 
-  return { devices, isLoading, fetchDevices, scanDevices, updateDevice };
+  const deleteDevice = useCallback(
+    async (id: number) => {
+      try {
+        await api.delete(`/devices/${id}`);
+        setDevices((prev) => prev.filter((d) => d.id !== id));
+        toast.success("Device removed");
+        return true;
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Failed to delete device",
+        );
+        return false;
+      }
+    },
+    [toast],
+  );
+
+  const deleteAllDevices = useCallback(async () => {
+    try {
+      const result = await api.delete<{
+        deleted_count: number;
+        message: string;
+      }>("/devices/");
+      setDevices([]);
+      toast.success(result?.message ?? "All devices cleared");
+      return true;
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to clear devices",
+      );
+      return false;
+    }
+  }, [toast]);
+
+  return {
+    devices,
+    isLoading,
+    fetchDevices,
+    scanDevices,
+    updateDevice,
+    deleteDevice,
+    deleteAllDevices,
+  };
 }
