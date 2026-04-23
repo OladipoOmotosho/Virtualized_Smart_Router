@@ -17,6 +17,28 @@ logger = logging.getLogger(__name__)
 _MAC_RE = re.compile(r"([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}")
 _OUI_DB: dict[str, str] = {}
 
+# IPs in this subnet are issued by scripts/setup-namespaces.sh, starting at
+# 10.0.0.2 for ns1. Auto-name new rows so they don't render as "Unnamed".
+_NAMESPACE_SUBNET = ipaddress.ip_network("10.0.0.0/24")
+_NAMESPACE_GATEWAY_HOST = 1  # 10.0.0.1 is the bridge gateway, not an IoT device
+
+
+def _default_name_for(ip: Optional[str]) -> Optional[str]:
+    """Return a sensible default display name for a newly-discovered device,
+    or None if no rule matches (the UI will show 'Unnamed')."""
+    if not ip:
+        return None
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return None
+    if addr in _NAMESPACE_SUBNET:
+        last_octet = int(str(addr).rsplit(".", 1)[1])
+        if last_octet == _NAMESPACE_GATEWAY_HOST:
+            return "Gateway Bridge"
+        return f"IoT Device ns{last_octet - _NAMESPACE_GATEWAY_HOST}"
+    return None
+
 
 def _load_oui_db() -> None:
     """Load the IEEE OUI CSV into an in-memory dict (prefix → vendor).
@@ -70,32 +92,35 @@ async def scan_network() -> list[DeviceResponse]:
             ipv4 = v4_by_mac.get(mac)
             ipv6 = v6_by_mac.get(mac)
             vendor = _lookup_vendor(mac)
+            default_name = _default_name_for(ipv4)
             if ipv4 is None:
                 # MAC only seen via IPv6 — preserve any existing IPv4 we already
                 # stored; don't overwrite with an empty value.
                 await db.execute(
                     """
-                    INSERT INTO devices (mac, ip, ipv6, vendor)
-                    VALUES (?, '', ?, ?)
+                    INSERT INTO devices (mac, ip, ipv6, vendor, name)
+                    VALUES (?, '', ?, ?, ?)
                     ON CONFLICT(mac) DO UPDATE SET
                         ipv6=excluded.ipv6,
                         vendor=excluded.vendor,
+                        name=COALESCE(devices.name, excluded.name),
                         updated_at=datetime('now')
                     """,
-                    (mac, ipv6, vendor),
+                    (mac, ipv6, vendor, default_name),
                 )
             else:
                 await db.execute(
                     """
-                    INSERT INTO devices (mac, ip, ipv6, vendor)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO devices (mac, ip, ipv6, vendor, name)
+                    VALUES (?, ?, ?, ?, ?)
                     ON CONFLICT(mac) DO UPDATE SET
                         ip=excluded.ip,
                         ipv6=COALESCE(excluded.ipv6, devices.ipv6),
                         vendor=excluded.vendor,
+                        name=COALESCE(devices.name, excluded.name),
                         updated_at=datetime('now')
                     """,
-                    (mac, ipv4, ipv6, vendor),
+                    (mac, ipv4, ipv6, vendor, default_name),
                 )
 
         # Backfill: rows that were stored before the OUI DB loaded (or before
@@ -103,15 +128,24 @@ async def scan_network() -> list[DeviceResponse]:
         # lookup would succeed today. Re-run it for every unresolved row,
         # independent of whether the device answered this scan.
         unresolved = await db.execute_fetchall(
-            "SELECT id, mac FROM devices WHERE vendor IS NULL OR vendor = ''"
+            "SELECT id, mac, ip, name FROM devices WHERE vendor IS NULL OR vendor = '' OR name IS NULL"
         )
         for row in unresolved:
+            updates: dict[str, object] = {}
+            if row["name"] is None:
+                default_name = _default_name_for(row["ip"])
+                if default_name is not None:
+                    updates["name"] = default_name
             refreshed = _lookup_vendor(row["mac"])
             if refreshed is not None:
-                await db.execute(
-                    "UPDATE devices SET vendor=? WHERE id=?",
-                    (refreshed, row["id"]),
-                )
+                updates["vendor"] = refreshed
+            if not updates:
+                continue
+            set_clause = ", ".join(f"{col} = ?" for col in updates)
+            await db.execute(
+                f"UPDATE devices SET {set_clause} WHERE id = ?",  # noqa: S608
+                [*updates.values(), row["id"]],
+            )
 
         await db.commit()
     return await get_all_devices()
