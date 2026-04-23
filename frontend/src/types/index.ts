@@ -4,6 +4,7 @@ export interface Device {
   id: number;
   mac: string;
   ip: string;
+  ipv6: string | null;
   name: string | null;
   model: string | null;
   version: string | null;
@@ -26,6 +27,7 @@ export interface CaptureStartRequest {
   device_ids: number[];
   duration?: number;
   packet_count?: number;
+  filename?: string;
 }
 
 export interface CaptureSession {

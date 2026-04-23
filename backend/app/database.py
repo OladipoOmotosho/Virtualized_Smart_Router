@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS devices (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     mac         TEXT    NOT NULL UNIQUE,
     ip          TEXT    NOT NULL,
+    ipv6        TEXT,
     name        TEXT,
     model       TEXT,
     version     TEXT,
@@ -83,4 +84,10 @@ async def init_db() -> None:
     """Create all tables on startup if they do not already exist."""
     async with get_db() as db:
         await db.executescript(_CREATE_TABLES)
+        # Lightweight migration: add `ipv6` to legacy devices tables that
+        # were created before the column was introduced.
+        cursor = await db.execute("PRAGMA table_info(devices)")
+        columns = {row[1] for row in await cursor.fetchall()}
+        if "ipv6" not in columns:
+            await db.execute("ALTER TABLE devices ADD COLUMN ipv6 TEXT")
         await db.commit()
