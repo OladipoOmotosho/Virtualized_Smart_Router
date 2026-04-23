@@ -1,7 +1,17 @@
 const BASE_URL = "/api";
 
+function friendlyStatusMessage(status: number): string {
+  if (status >= 500) return "Server error — please try again in a moment.";
+  if (status === 404) return "Not found.";
+  if (status === 401 || status === 403) return "You're not authorized to do that.";
+  if (status === 408 || status === 504) return "The server took too long to respond.";
+  if (status === 429) return "Too many requests — slow down and try again.";
+  if (status >= 400) return "The request was invalid.";
+  return `Unexpected response (HTTP ${status}).`;
+}
+
 function formatErrorDetail(detail: unknown, status: number): string {
-  if (typeof detail === "string") {
+  if (typeof detail === "string" && detail.trim()) {
     return detail;
   }
 
@@ -29,13 +39,15 @@ function formatErrorDetail(detail: unknown, status: number): string {
     return JSON.stringify(detail);
   }
 
-  return `HTTP ${status}`;
+  // FastAPI returned no detail (common on 500 / unhandled exceptions) — fall
+  // back to a user-friendly message based on the status code.
+  return friendlyStatusMessage(status);
 }
 
 class ApiError extends Error {
   constructor(
     public status: number,
-    message: string
+    message: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -43,10 +55,18 @@ class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...init?.headers },
-    ...init,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      headers: { "Content-Type": "application/json", ...init?.headers },
+      ...init,
+    });
+  } catch {
+    throw new ApiError(
+      0,
+      "Cannot reach the server — check that the backend is running.",
+    );
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

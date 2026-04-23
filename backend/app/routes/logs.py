@@ -1,3 +1,5 @@
+from typing import Literal, Optional
+
 from fastapi import APIRouter, Query
 
 from app.schemas.logs import LogPurgeResponse, TrafficHistoryResponse
@@ -25,6 +27,21 @@ async def get_system_logs(
 
 
 @router.delete("/purge", response_model=LogPurgeResponse)
-async def purge_old_logs():
-    """Delete log and traffic history records older than the configured retention period."""
-    return await logs_service.purge_old_logs()
+async def purge_old_logs(
+    scope: Literal["traffic", "alerts", "both"] = Query(
+        "both", description="Which table(s) to purge"
+    ),
+    older_than_days: Optional[int] = Query(
+        None,
+        ge=0,
+        description="Delete rows older than N days. Omit to delete all rows in scope.",
+    ),
+):
+    """Delete log and/or traffic history records.
+
+    By default deletes every row in both tables. Pass `scope` and/or
+    `older_than_days` to scope the deletion.
+    """
+    return await logs_service.purge_old_logs(
+        scope=scope, older_than_days=older_than_days
+    )
