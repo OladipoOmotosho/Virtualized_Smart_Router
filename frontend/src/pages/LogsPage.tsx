@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -32,13 +32,19 @@ export default function LogsPage() {
     purge,
   } = useLogs();
 
+  const [page, setPage] = useState(1);
+
   useEffect(() => {
     fetchTraffic();
   }, [fetchTraffic, days]);
 
   useEffect(() => {
-    fetchSystemLogs();
-  }, [fetchSystemLogs]);
+    fetchSystemLogs(page);
+  }, [fetchSystemLogs, page]);
+
+  const totalPages = systemLogs
+    ? Math.max(1, Math.ceil(systemLogs.total / systemLogs.limit))
+    : 1;
 
   return (
     <div>
@@ -178,6 +184,29 @@ export default function LogsPage() {
               ))}
             </tbody>
           </table>
+          {systemLogs.total > 0 && (
+            <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50">
+              <p className="text-xs text-gray-500">
+                Page {page} of {totalPages}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1 || isLoading}
+                  className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft size={14} /> Prev
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages || isLoading}
+                  className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

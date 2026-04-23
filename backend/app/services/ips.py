@@ -46,10 +46,14 @@ def _log_block_task_result(task: asyncio.Task[None]) -> None:
 
 async def get_status() -> dict[str, Any]:
     """Return IPS monitoring status and per-device thresholds."""
+    async with get_db() as db:
+        row = await db.execute_fetchall("SELECT COUNT(*) AS cnt FROM devices")
+        device_count = row[0]["cnt"] if row else 0
+
     return {
         "poll_interval_seconds": settings.ips_poll_interval,
         "block_duration_seconds": BLOCK_DURATION_SECONDS,
-        "monitored_devices": len(_thresholds),
+        "monitored_devices": device_count,
         "thresholds": _thresholds,
     }
 
