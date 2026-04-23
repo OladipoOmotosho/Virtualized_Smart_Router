@@ -4,6 +4,7 @@ import asyncio
 import ipaddress
 import logging
 import os
+import re
 import subprocess
 from datetime import datetime
 from typing import Optional
@@ -51,10 +52,25 @@ async def _stop_capture_after_delay(device_id: int, delay: int) -> None:
         await db.commit()
 
 
+_FILENAME_SAFE_RE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _sanitize_filename_base(raw: str) -> str:
+    """Strip path separators and unsafe characters. Drops .pcap suffix if present."""
+    base = os.path.basename(raw).strip()
+    if base.lower().endswith(".pcap"):
+        base = base[:-5]
+    base = _FILENAME_SAFE_RE.sub("_", base).strip("._-")
+    return base
+
+
 async def start_capture(req: CaptureStartRequest) -> list[CaptureSessionResponse]:
     """Start tcpdump for each requested device. Skips devices already being captured."""
     os.makedirs(settings.pcap_dir, exist_ok=True)
     sessions: list[CaptureSessionResponse] = []
+
+    custom_base = _sanitize_filename_base(req.filename) if req.filename else ""
+    multiple_devices = len(req.device_ids) > 1
 
     async with get_db() as db:
         for device_id in req.device_ids:
@@ -69,7 +85,12 @@ async def start_capture(req: CaptureStartRequest) -> list[CaptureSessionResponse
 
             device_ip = str(ipaddress.ip_address(row[0]["ip"]))
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            pcap_file = os.path.join(settings.pcap_dir, f"device_{device_id}_{timestamp}.pcap")
+            if custom_base:
+                # With multiple devices, keep filenames unique by suffixing id.
+                name = f"{custom_base}_device{device_id}" if multiple_devices else custom_base
+                pcap_file = os.path.join(settings.pcap_dir, f"{name}.pcap")
+            else:
+                pcap_file = os.path.join(settings.pcap_dir, f"device_{device_id}_{timestamp}.pcap")
 
             cmd = ["tcpdump", "-i", "any", "-w", pcap_file, f"host {device_ip}"]
             if req.packet_count:
