@@ -33,6 +33,11 @@ class DeviceCreate(DeviceBase):
     @field_validator("ip")
     @classmethod
     def validate_ip(cls, value: str) -> str:
+        # Rows discovered only via the IPv6 neighbour table are persisted
+        # with ip='' until an IPv4 answer comes in. Allow the placeholder
+        # through so DeviceResponse can roundtrip it.
+        if not value:
+            return ""
         try:
             return str(ipaddress.IPv4Address(value))
         except ValueError as exc:
