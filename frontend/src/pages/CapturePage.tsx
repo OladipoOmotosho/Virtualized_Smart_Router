@@ -27,6 +27,7 @@ export default function CapturePage() {
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
   const [duration, setDuration] = useState("");
   const [packetCount, setPacketCount] = useState("");
+  const [filenameBase, setFilenameBase] = useState("");
   const refreshTimeoutIdsRef = useRef<number[]>([]);
   const autoStopTimeoutByDeviceRef = useRef<Map<number, number>>(new Map());
 
@@ -102,11 +103,13 @@ export default function CapturePage() {
     const capturePacketCount =
       parsedPacketCount && parsedPacketCount > 0 ? parsedPacketCount : undefined;
 
+    const trimmedFilename = filenameBase.trim();
     try {
       await startCapture({
         device_ids: selectedIds,
         duration: captureDuration,
         packet_count: capturePacketCount,
+        filename: trimmedFilename || undefined,
       });
       setActiveIds((prev) => [...new Set([...prev, ...selectedIds])]);
       // Delay file refresh so tcpdump writes the pcap header first
@@ -151,6 +154,7 @@ export default function CapturePage() {
       }
 
       setPacketCount("");
+      setFilenameBase("");
     } catch {
       // useCapture surfaces start errors; keep local active state unchanged.
     }
@@ -278,6 +282,19 @@ export default function CapturePage() {
             onChange={(e) => setPacketCount(e.target.value)}
             placeholder="Unlimited"
           />
+          <div className="md:col-span-3">
+            <Input
+              label="Pcap Filename (optional)"
+              type="text"
+              value={filenameBase}
+              onChange={(e) => setFilenameBase(e.target.value)}
+              placeholder="e.g. kitchen_cam_baseline  (auto-generated if blank)"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Letters, digits, <code>._-</code> only. With multiple devices,
+              <code> _deviceN</code> is appended to keep files unique.
+            </p>
+          </div>
         </div>
         <div className="flex gap-3">
           <Button

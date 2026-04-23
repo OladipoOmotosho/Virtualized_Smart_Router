@@ -52,22 +52,51 @@ async def get_all_devices() -> list[DeviceResponse]:
 
 
 async def scan_network() -> list[DeviceResponse]:
-    """Trigger an ARP scan, parse results, upsert devices, and return updated list.
+    """Trigger an ARP + IPv6 neighbour scan, upsert devices, return the list.
 
-    Requires root — arp-scan or parsing /proc/net/arp on the CentOS VM.
+    Requires root — parses /proc/net/arp and runs `ip -6 neigh show` on the
+    CentOS VM. MAC is the join key; if a host answers only over IPv6 we still
+    create/update its row.
     """
-    raw_entries = await asyncio.to_thread(_read_arp_table)
+    v4_entries, v6_by_mac = await asyncio.gather(
+        asyncio.to_thread(_read_arp_table),
+        asyncio.to_thread(_read_ipv6_neighbours),
+    )
+    v4_by_mac = {mac: ip for mac, ip in v4_entries}
+    all_macs = set(v4_by_mac) | set(v6_by_mac)
+
     async with get_db() as db:
-        for mac, ip in raw_entries:
+        for mac in all_macs:
+            ipv4 = v4_by_mac.get(mac)
+            ipv6 = v6_by_mac.get(mac)
             vendor = _lookup_vendor(mac)
-            await db.execute(
-                """
-                INSERT INTO devices (mac, ip, vendor)
-                VALUES (?, ?, ?)
-                ON CONFLICT(mac) DO UPDATE SET ip=excluded.ip, vendor=excluded.vendor, updated_at=datetime('now')
-                """,
-                (mac, ip, vendor),
-            )
+            if ipv4 is None:
+                # MAC only seen via IPv6 — preserve any existing IPv4 we already
+                # stored; don't overwrite with an empty value.
+                await db.execute(
+                    """
+                    INSERT INTO devices (mac, ip, ipv6, vendor)
+                    VALUES (?, '', ?, ?)
+                    ON CONFLICT(mac) DO UPDATE SET
+                        ipv6=excluded.ipv6,
+                        vendor=excluded.vendor,
+                        updated_at=datetime('now')
+                    """,
+                    (mac, ipv6, vendor),
+                )
+            else:
+                await db.execute(
+                    """
+                    INSERT INTO devices (mac, ip, ipv6, vendor)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(mac) DO UPDATE SET
+                        ip=excluded.ip,
+                        ipv6=COALESCE(excluded.ipv6, devices.ipv6),
+                        vendor=excluded.vendor,
+                        updated_at=datetime('now')
+                    """,
+                    (mac, ipv4, ipv6, vendor),
+                )
         await db.commit()
     return await get_all_devices()
 
@@ -112,6 +141,49 @@ def _read_arp_table() -> list[tuple[str, str]]:
     except FileNotFoundError:
         logger.warning("/proc/net/arp not found — not running on Linux")
     return entries
+
+
+def _read_ipv6_neighbours() -> dict[str, str]:
+    """Return {mac: ipv6} from `ip -6 neigh show`. Empty on non-Linux or no IPv6.
+
+    Example output line:
+        fe80::1 dev veth1 lladdr aa:bb:cc:dd:ee:ff REACHABLE
+    """
+    try:
+        result = shell.run(["ip", "-6", "neigh", "show"], check=False)
+    except FileNotFoundError:
+        logger.info("`ip` command not available — skipping IPv6 neighbour scan")
+        return {}
+    except Exception:
+        logger.warning("IPv6 neighbour scan failed", exc_info=True)
+        return {}
+
+    stdout = result.stdout or b""
+    if isinstance(stdout, bytes):
+        stdout = stdout.decode("utf-8", errors="replace")
+    mapping: dict[str, str] = {}
+    for line in stdout.splitlines():
+        parts = line.split()
+        if "lladdr" not in parts:
+            continue
+        try:
+            ipv6 = parts[0]
+            mac = parts[parts.index("lladdr") + 1]
+        except (IndexError, ValueError):
+            continue
+        if not _MAC_RE.fullmatch(mac) or mac == "00:00:00:00:00:00":
+            continue
+        try:
+            ipaddress.IPv6Address(ipv6)
+        except ValueError:
+            continue
+        # Prefer the first non-link-local address; keep link-local as fallback.
+        existing = mapping.get(mac)
+        if existing and existing.lower().startswith("fe80") and not ipv6.lower().startswith("fe80"):
+            mapping[mac] = ipv6
+        elif mac not in mapping:
+            mapping[mac] = ipv6
+    return mapping
 
 
 def _lookup_vendor(mac: str) -> Optional[str]:

@@ -1,12 +1,18 @@
 """Log and file management service: traffic history, system logs, retention purge."""
 
+import asyncio
 import logging
 from typing import Literal, Optional
 
+from app.config import settings
 from app.database import get_db
 from app.schemas.logs import LogPurgeResponse, TrafficDataPoint, TrafficHistoryResponse
 
 logger = logging.getLogger(__name__)
+
+# Run the automatic retention sweep roughly once a day. Low enough to survive a
+# forgotten long-running instance, high enough to not spam the DB.
+_AUTO_PURGE_INTERVAL_SECONDS = 24 * 60 * 60
 
 PurgeScope = Literal["traffic", "alerts", "both"]
 
@@ -110,3 +116,32 @@ async def purge_old_logs(
     message = f"Deleted {total} {_SCOPE_LABEL[scope]} {cutoff_desc}"
     logger.info(message)
     return LogPurgeResponse(deleted_count=total, message=message)
+
+
+async def auto_purge_loop() -> None:
+    """Background task: periodically delete records older than LOG_RETENTION_DAYS.
+
+    Runs an initial sweep shortly after startup, then once per day. Cancelled
+    cleanly by the FastAPI lifespan on shutdown.
+    """
+    retention = settings.log_retention_days
+    if retention <= 0:
+        logger.info("Auto-purge disabled (LOG_RETENTION_DAYS=%d)", retention)
+        return
+
+    logger.info(
+        "Auto-purge loop started — retention=%d days, interval=%ds",
+        retention,
+        _AUTO_PURGE_INTERVAL_SECONDS,
+    )
+    # Wait briefly on first run so boot-time work (firewall reload, IPS monitor
+    # priming) finishes before we hit the DB.
+    await asyncio.sleep(30)
+    while True:
+        try:
+            await purge_old_logs(scope="both", older_than_days=retention)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Auto-purge sweep failed")
+        await asyncio.sleep(_AUTO_PURGE_INTERVAL_SECONDS)
