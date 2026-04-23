@@ -4,7 +4,7 @@ import { useIps } from "@/hooks/useIps";
 import { formatDataRate, formatTimestamp } from "@/lib/utils";
 
 export default function IpsPage() {
-  const { status, alerts, isLoading, error } = useIps();
+  const { status, alerts, isLoading } = useIps();
 
   return (
     <div>
@@ -28,8 +28,6 @@ export default function IpsPage() {
           ))}
         </div>
       )}
-
-      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">

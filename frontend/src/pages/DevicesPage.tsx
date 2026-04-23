@@ -10,7 +10,7 @@ import type { Device, DeviceUpdate } from "@/types";
 import { formatTimestamp } from "@/lib/utils";
 
 export default function DevicesPage() {
-  const { devices, isLoading, error, fetchDevices, scanDevices, updateDevice } =
+  const { devices, isLoading, fetchDevices, scanDevices, updateDevice } =
     useDevices();
   const [editing, setEditing] = useState<Device | null>(null);
   const [form, setForm] = useState<DeviceUpdate>({});
@@ -51,8 +51,6 @@ export default function DevicesPage() {
           Scan Network
         </Button>
       </div>
-
-      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
       {isLoading && !devices.length ? (
         <div className="flex justify-center py-20">

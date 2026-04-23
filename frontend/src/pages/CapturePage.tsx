@@ -12,7 +12,6 @@ export default function CapturePage() {
   const {
     files,
     isLoading,
-    error,
     startCapture,
     stopCapture,
     fetchFiles,
@@ -225,8 +224,6 @@ export default function CapturePage() {
           </div>
         </div>
       )}
-
-      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
         <h2 className="font-semibold text-gray-700 mb-4">

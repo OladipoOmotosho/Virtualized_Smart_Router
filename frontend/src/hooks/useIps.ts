@@ -1,37 +1,38 @@
 import { useState, useCallback, useEffect } from "react";
 import { api } from "@/lib/api";
+import { useToast } from "@/contexts/ToastContext";
 import type { IpsAlert, IpsStatus } from "@/types";
 
 const POLL_INTERVAL_MS = 10_000;
 
 export function useIps() {
+  const toast = useToast();
   const [status, setStatus] = useState<IpsStatus | null>(null);
   const [alerts, setAlerts] = useState<IpsAlert[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
-      setError(null);
       const data = await api.get<IpsStatus>("/ips/status");
       setStatus(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load IPS status");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to load IPS status",
+      );
     }
-  }, []);
+  }, [toast]);
 
   const fetchAlerts = useCallback(async () => {
     try {
       setIsLoading(true);
-      setError(null);
       const data = await api.get<IpsAlert[]>("/ips/alerts");
       setAlerts(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load alerts");
+      toast.error(err instanceof Error ? err.message : "Failed to load alerts");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   // Auto-refresh alerts on a polling interval
   useEffect(() => {
@@ -44,5 +45,5 @@ export function useIps() {
     return () => clearInterval(id);
   }, [fetchStatus, fetchAlerts]);
 
-  return { status, alerts, isLoading, error, fetchAlerts };
+  return { status, alerts, isLoading, fetchAlerts };
 }
