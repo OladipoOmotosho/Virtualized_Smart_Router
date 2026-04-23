@@ -15,7 +15,6 @@ export default function FirewallPage() {
   const {
     rules,
     isLoading: rulesLoading,
-    error,
     fetchRules,
     addRule,
     deleteRule,
@@ -81,8 +80,6 @@ export default function FirewallPage() {
           </Button>
         </div>
       </div>
-
-      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
       {rulesLoading && !rules.length ? (
         <div className="flex justify-center py-20">

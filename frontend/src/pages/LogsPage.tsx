@@ -11,9 +11,27 @@ import {
   CartesianGrid,
 } from "recharts";
 import { useLogs } from "@/hooks/useLogs";
+import { useToast } from "@/contexts/ToastContext";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
 import { formatTimestamp } from "@/lib/utils";
+
+type PurgeScope = "traffic" | "alerts" | "both";
+type PurgeCutoff = "7" | "30" | "90" | "all";
+
+const SCOPE_LABEL: Record<PurgeScope, string> = {
+  traffic: "Traffic history only",
+  alerts: "IPS alerts only",
+  both: "Both traffic history and IPS alerts",
+};
+
+const CUTOFF_OPTIONS: { value: PurgeCutoff; label: string }[] = [
+  { value: "7", label: "Older than 7 days" },
+  { value: "30", label: "Older than 30 days" },
+  { value: "90", label: "Older than 90 days" },
+  { value: "all", label: "All records (no cutoff)" },
+];
 
 const DAY_OPTIONS = [1, 3, 7, 14, 30];
 
@@ -26,13 +44,16 @@ export default function LogsPage() {
     days,
     setDays,
     isLoading,
-    error,
     fetchTraffic,
     fetchSystemLogs,
     purge,
   } = useLogs();
+  const toast = useToast();
 
   const [page, setPage] = useState(1);
+  const [purgeModalOpen, setPurgeModalOpen] = useState(false);
+  const [purgeScope, setPurgeScope] = useState<PurgeScope>("both");
+  const [purgeCutoff, setPurgeCutoff] = useState<PurgeCutoff>("30");
 
   useEffect(() => {
     fetchTraffic();
@@ -46,6 +67,20 @@ export default function LogsPage() {
     ? Math.max(1, Math.ceil(systemLogs.total / systemLogs.limit))
     : 1;
 
+  const handleConfirmPurge = async () => {
+    const olderThanDays = purgeCutoff === "all" ? null : Number(purgeCutoff);
+    try {
+      const result = await purge({ scope: purgeScope, olderThanDays });
+      toast.success(result?.message ?? "Purge complete");
+      setPurgeModalOpen(false);
+      setPage(1);
+      fetchTraffic();
+      fetchSystemLogs(1);
+    } catch {
+      // toast already shown by the hook
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -55,16 +90,13 @@ export default function LogsPage() {
             Traffic history and system activity
           </p>
         </div>
-        <Button variant="danger" onClick={() => {
-          if (window.confirm("Are you sure you want to purge old logs? This cannot be undone.")) {
-            purge();
-          }
-        }}>
+        <Button
+          variant="danger"
+          onClick={() => setPurgeModalOpen(true)}
+        >
           <Trash2 size={14} /> Purge Old Logs
         </Button>
       </div>
-
-      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
         <div className="flex items-center justify-between mb-4">
@@ -209,6 +241,79 @@ export default function LogsPage() {
           )}
         </div>
       )}
+
+      <Modal
+        open={purgeModalOpen}
+        onClose={() => setPurgeModalOpen(false)}
+        title="Purge Logs"
+      >
+        <p className="text-sm text-gray-600 mb-4">
+          Select what to delete. This cannot be undone.
+        </p>
+
+        <div className="mb-4">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+            Scope
+          </p>
+          <div className="space-y-2">
+            {(Object.keys(SCOPE_LABEL) as PurgeScope[]).map((s) => (
+              <label
+                key={s}
+                className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"
+              >
+                <input
+                  type="radio"
+                  name="purge-scope"
+                  value={s}
+                  checked={purgeScope === s}
+                  onChange={() => setPurgeScope(s)}
+                  className="accent-blue-600"
+                />
+                {SCOPE_LABEL[s]}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+            Timeline
+          </p>
+          <select
+            value={purgeCutoff}
+            onChange={(e) => setPurgeCutoff(e.target.value as PurgeCutoff)}
+            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {CUTOFF_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          {purgeCutoff === "all" && (
+            <p className="text-xs text-red-500 mt-2">
+              Warning: this deletes every row in the selected scope.
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => setPurgeModalOpen(false)}
+            disabled={isLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={handleConfirmPurge}
+            disabled={isLoading}
+          >
+            <Trash2 size={14} /> Purge
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

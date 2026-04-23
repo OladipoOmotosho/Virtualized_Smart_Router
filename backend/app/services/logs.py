@@ -1,13 +1,20 @@
 """Log and file management service: traffic history, system logs, retention purge."""
 
 import logging
-from typing import Optional
+from typing import Literal, Optional
 
-from app.config import settings
 from app.database import get_db
 from app.schemas.logs import LogPurgeResponse, TrafficDataPoint, TrafficHistoryResponse
 
 logger = logging.getLogger(__name__)
+
+PurgeScope = Literal["traffic", "alerts", "both"]
+
+_SCOPE_LABEL = {
+    "traffic": "traffic history",
+    "alerts": "IPS alerts",
+    "both": "records",
+}
 
 
 async def get_traffic_history(
@@ -63,25 +70,43 @@ async def get_system_logs(page: int = 1, limit: int = 20) -> dict:
         }
 
 
-async def purge_old_logs() -> LogPurgeResponse:
-    """Delete traffic history and IPS alert records older than the retention period."""
-    retention = settings.log_retention_days
+async def purge_old_logs(
+    scope: PurgeScope = "both",
+    older_than_days: Optional[int] = None,
+) -> LogPurgeResponse:
+    """Delete traffic history and/or IPS alert records.
+
+    scope: "traffic", "alerts", or "both".
+    older_than_days: cutoff in days. None deletes every row in the chosen scope.
+    """
+    traffic_deleted = 0
+    alerts_deleted = 0
+
     async with get_db() as db:
-        c1 = await db.execute(
-            "DELETE FROM traffic_history WHERE recorded_at < datetime('now', ? || ' days')",
-            (f"-{retention}",),
-        )
-        c1_rowcount = c1.rowcount
-        c2 = await db.execute(
-            "DELETE FROM ips_alerts WHERE triggered_at < datetime('now', ? || ' days')",
-            (f"-{retention}",),
-        )
-        c2_rowcount = c2.rowcount
+        if scope in ("traffic", "both"):
+            if older_than_days is None:
+                c = await db.execute("DELETE FROM traffic_history")
+            else:
+                c = await db.execute(
+                    "DELETE FROM traffic_history WHERE recorded_at < datetime('now', ? || ' days')",
+                    (f"-{older_than_days}",),
+                )
+            traffic_deleted = c.rowcount
+
+        if scope in ("alerts", "both"):
+            if older_than_days is None:
+                c = await db.execute("DELETE FROM ips_alerts")
+            else:
+                c = await db.execute(
+                    "DELETE FROM ips_alerts WHERE triggered_at < datetime('now', ? || ' days')",
+                    (f"-{older_than_days}",),
+                )
+            alerts_deleted = c.rowcount
+
         await db.commit()
 
-    deleted = c1_rowcount + c2_rowcount
-    logger.info("Purged %d old log records (retention=%d days)", deleted, retention)
-    return LogPurgeResponse(
-        deleted_count=deleted,
-        message=f"Deleted {deleted} records older than {retention} days",
-    )
+    total = traffic_deleted + alerts_deleted
+    cutoff_desc = "(all)" if older_than_days is None else f"older than {older_than_days} days"
+    message = f"Deleted {total} {_SCOPE_LABEL[scope]} {cutoff_desc}"
+    logger.info(message)
+    return LogPurgeResponse(deleted_count=total, message=message)
