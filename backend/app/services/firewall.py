@@ -57,15 +57,21 @@ async def apply_all_rules() -> None:
     """
     rules = await get_all_rules()
 
+    # Flush the FORWARD chain before re-applying
+    await shell.run_async(["iptables", "-F", "FORWARD"])
+
+    if not rules:
+        # No whitelist rules means we leave forwarding open.
+        await shell.run_async(["iptables", "-P", "FORWARD", "ACCEPT"])
+        logger.info("Firewall rules cleared — forwarding policy set to ACCEPT")
+        return
+
     # Fetch device IPs for each rule
     async with get_db() as db:
         device_ips: dict[int, str] = {}
         rows = await db.execute_fetchall("SELECT id, ip FROM devices")
         for row in rows:
             device_ips[row["id"]] = row["ip"]
-
-    # Flush the FORWARD chain before re-applying
-    await shell.run_async(["iptables", "-F", "FORWARD"])
 
     for rule in rules:
         device_ip = device_ips.get(rule.device_id)
