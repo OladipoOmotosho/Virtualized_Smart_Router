@@ -24,6 +24,7 @@ export default function FirewallPage() {
   const [showForm, setShowForm] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [form, setForm] = useState<FirewallRuleCreate>({
     device_id: 0,
     dest_ip: "",
@@ -55,10 +56,25 @@ export default function FirewallPage() {
     if (confirmDeleteId === null) return;
     setPendingDeleteId(confirmDeleteId);
     try {
-      await deleteRule(confirmDeleteId);
+      const deleted = await deleteRule(confirmDeleteId);
+      if (deleted) {
+        await applyRules();
+      }
     } finally {
       setPendingDeleteId(null);
       setConfirmDeleteId(null);
+    }
+  }
+
+  async function handleClearAll() {
+    if (!rules.length) return;
+    setIsLoading(true);
+    try {
+      await Promise.all(rules.map((rule) => deleteRule(rule.id)));
+      await applyRules();
+      setConfirmClearAll(false);
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -72,6 +88,15 @@ export default function FirewallPage() {
           </p>
         </div>
         <div className="flex gap-3">
+          {rules.length > 0 && (
+            <Button
+              variant="danger"
+              onClick={() => setConfirmClearAll(true)}
+              disabled={isLoading || rulesLoading}
+            >
+              Clear All
+            </Button>
+          )}
           <Button variant="secondary" onClick={() => setShowForm(true)}>
             <Plus size={14} /> Add Rule
           </Button>
@@ -144,8 +169,8 @@ export default function FirewallPage() {
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            Are you sure you want to delete this firewall rule? You will need to
-            click <strong>Apply Rules</strong> to update iptables after deletion.
+            Are you sure you want to delete this firewall rule? Changes apply
+            immediately after deletion.
           </p>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" onClick={() => setConfirmDeleteId(null)}>
@@ -157,6 +182,26 @@ export default function FirewallPage() {
               loading={pendingDeleteId !== null}
             >
               Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={confirmClearAll}
+        onClose={() => setConfirmClearAll(false)}
+        title="Clear All Rules"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            This will delete every firewall rule and apply the change immediately.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setConfirmClearAll(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleClearAll} loading={isLoading}>
+              Clear All
             </Button>
           </div>
         </div>
