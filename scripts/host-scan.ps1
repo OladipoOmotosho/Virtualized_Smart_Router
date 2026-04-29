@@ -3,7 +3,7 @@
 # them to the backend's /api/devices/external-scan endpoint.
 #
 # Why this exists: when the backend runs inside a VirtualBox VM in NAT mode, it
-# cannot see the hotspot's ARP table — that lives on the Windows host. This
+# cannot see the hotspot's ARP table -- that lives on the Windows host. This
 # script is the bridge: it reads `arp -a`, filters to the hotspot subnet, and
 # pushes the results into the backend so the UI shows real connected devices.
 #
@@ -17,8 +17,8 @@
 
 param(
     [string]$BackendUrl = "http://localhost:8000",
-    [string]$Subnet = "192.168.137.",   # Windows Mobile Hotspot default
-    [switch]$Loop,                       # keep scanning every 5 seconds
+    [string]$Subnet = "192.168.137.",
+    [switch]$Loop,
     [int]$LoopIntervalSeconds = 5
 )
 
@@ -30,10 +30,10 @@ function Invoke-Scan {
 
     foreach ($line in $arpOutput) {
         # Typical line: "  192.168.137.12        aa-bb-cc-dd-ee-ff     dynamic"
-        if ($line -match "^\s+(?<ip>$([regex]::Escape($Subnet))\d+)\s+(?<mac>[0-9a-fA-F]{2}(?:-[0-9a-fA-F]{2}){5})\s+") {
+        $escaped = [regex]::Escape($Subnet)
+        if ($line -match "^\s+(?<ip>$escaped\d+)\s+(?<mac>[0-9a-fA-F]{2}(?:-[0-9a-fA-F]{2}){5})\s+") {
             $ip = $matches['ip']
             $mac = ($matches['mac'] -replace '-', ':').ToLower()
-            # Skip broadcast + the hotspot gateway itself (.1)
             if ($mac -eq "ff:ff:ff:ff:ff:ff") { continue }
             if ($ip -match "\.1$") { continue }
             $devices += @{ ip = $ip; mac = $mac }
@@ -41,7 +41,7 @@ function Invoke-Scan {
     }
 
     if ($devices.Count -eq 0) {
-        Write-Host "[host-scan] no devices found on $Subnet — is anything connected to the hotspot?" -ForegroundColor Yellow
+        Write-Host "[host-scan] no devices found on $Subnet - is anything connected to the hotspot?" -ForegroundColor Yellow
         return
     }
 
@@ -55,13 +55,14 @@ function Invoke-Scan {
             Write-Host ("  - {0}  {1}" -f $d.ip, $d.mac) -ForegroundColor Gray
         }
     } catch {
-        Write-Host "[host-scan] POST failed: $($_.Exception.Message)" -ForegroundColor Red
-        Write-Host "  (is the backend running at $BackendUrl?)" -ForegroundColor Red
+        $msg = $_.Exception.Message
+        Write-Host "[host-scan] POST failed: $msg" -ForegroundColor Red
+        Write-Host "  (is the backend running at $BackendUrl ?)" -ForegroundColor Red
     }
 }
 
 if ($Loop) {
-    Write-Host "[host-scan] looping every $LoopIntervalSeconds s — Ctrl+C to stop"
+    Write-Host "[host-scan] looping every $LoopIntervalSeconds s - press Ctrl+C to stop"
     while ($true) {
         Invoke-Scan -BackendUrl $BackendUrl -Subnet $Subnet
         Start-Sleep -Seconds $LoopIntervalSeconds
