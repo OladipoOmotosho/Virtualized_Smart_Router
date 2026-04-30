@@ -139,7 +139,15 @@ async def _reset_counter_chain(device_ips: dict[int, str]) -> None:
 async def get_device_counters() -> list[FirewallDeviceCounter]:
     async with get_db() as db:
         rows = await db.execute_fetchall("SELECT id, ip FROM devices")
-        device_ips = {row["id"]: row["ip"] for row in rows}
+        device_ips: dict[int, str] = {}
+        for row in rows:
+            ip = row["ip"]
+            if not ip:
+                continue
+            try:
+                device_ips[row["id"]] = _validate_ip(ip)
+            except ValueError:
+                continue
 
     counters: dict[int, dict[str, int]] = {
         device_id: {

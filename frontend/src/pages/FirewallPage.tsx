@@ -196,9 +196,15 @@ export default function FirewallPage() {
                 {counters.map((c) => (
                   <tr key={c.device_id} className="hover:bg-gray-50">
                     <td className="px-4 py-2 text-gray-700">
-                      {devices.find((d) => d.id === c.device_id)?.name ??
-                        devices.find((d) => d.id === c.device_id)?.ip ??
-                        `Device #${c.device_id}`}
+                      {(() => {
+                        const device = devices.find((d) => d.id === c.device_id);
+                        return (
+                          device?.name ||
+                          device?.ip ||
+                          c.ip ||
+                          `Device #${c.device_id}`
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-2 font-mono text-xs text-gray-600">
                       {formatBytes(c.rx_bytes)}
