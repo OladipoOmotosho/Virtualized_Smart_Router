@@ -12,7 +12,7 @@
 set -euo pipefail
 
 GATEWAY_IP="10.0.0.1"
-GATEWAY_IFACE="eth0"   # Change to your actual outbound interface
+GATEWAY_IFACE="enp0s3"   # Change to your actual outbound interface
 NUM_DEVICES=3          # Number of simulated IoT devices to create
 
 # Enable IP forwarding

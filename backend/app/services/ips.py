@@ -21,10 +21,10 @@ _thresholds: dict[int, float] = {}
 _prev_counters: dict[int, tuple[int, float]] = {}
 
 # Default threshold if none is configured per device
-DEFAULT_THRESHOLD_KBPS: float = 500.0
+DEFAULT_THRESHOLD_KBPS: float = 10.0
 
 # How long (seconds) to temporarily block a device after an anomaly
-BLOCK_DURATION_SECONDS: int = 300
+BLOCK_DURATION_SECONDS: int = 30
 
 # Forensic capture duration when an anomaly fires
 ANOMALY_CAPTURE_SECONDS: int = 10
