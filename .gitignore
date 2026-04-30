@@ -39,15 +39,6 @@ pcaps/
 # Logs
 *.log
 
-# Dnsmasq/hostapd config artifacts accidentally created in repo root
-bind-interfaces
-log-dhcp
-dhcp-range=*
-dhcp-option=*
-interface=*
-server=*
-EOF
-
 # Node
 node_modules/
 frontend/dist/
