@@ -10,6 +10,7 @@ from app.database import get_db
 from app.schemas.capture import CaptureStartRequest
 from app.schemas.logs import IpsAlertResponse
 from app.services import capture as capture_service
+from app.services import firewall as firewall_service
 from app.utils import email, shell
 
 logger = logging.getLogger(__name__)
@@ -84,45 +85,63 @@ async def monitor_loop() -> None:
 
 async def _poll_devices() -> None:
     """Read /proc/net/dev counters and check each device against its threshold."""
-    counters = await asyncio.to_thread(_read_proc_net_dev)
-
     history_rows: list[tuple[int, float]] = []
     anomaly_events: list[tuple[int, float, float]] = []
 
+    iptables_counters = await firewall_service.get_device_counters()
+    counter_map = {
+        c.device_id: c.rx_bytes + c.tx_bytes for c in iptables_counters
+    }
+
     async with get_db() as db:
         rows = await db.execute_fetchall("SELECT id, ip FROM devices")
-        devices = {row["ip"]: row["id"] for row in rows}
-
-        veth_ifaces = {k: v for k, v in counters.items() if k.startswith("veth")}
-        if veth_ifaces:
-            logger.info("IPS poll: veth counters=%s devices_by_ip=%s", veth_ifaces, devices)
+        devices_by_ip = {row["ip"]: row["id"] for row in rows}
 
         now = time.monotonic()
 
-        for iface, rx_bytes in counters.items():
-            # Map interface name to device — in namespace setup each veth has a known name
-            device_id = _interface_to_device_id(iface, devices)
-            if device_id is None:
-                continue
+        if counter_map:
+            for device_id, total_bytes in counter_map.items():
+                if device_id in _prev_counters:
+                    prev_bytes, prev_time = _prev_counters[device_id]
+                    delta_bytes = total_bytes - prev_bytes
+                    delta_time = now - prev_time
 
-            if device_id in _prev_counters:
-                prev_bytes, prev_time = _prev_counters[device_id]
-                delta_bytes = rx_bytes - prev_bytes
-                delta_time = now - prev_time
+                    if delta_bytes < 0:
+                        delta_bytes += 2**64
 
-                # Handle /proc/net/dev counter wraparound
-                if delta_bytes < 0:
-                    delta_bytes += 2**64
+                    rate_kbps = (delta_bytes / 1024) / delta_time if delta_time > 0 else 0.0
+                    threshold = _thresholds.get(device_id, DEFAULT_THRESHOLD_KBPS)
+                    history_rows.append((device_id, rate_kbps))
+                    if rate_kbps > threshold:
+                        anomaly_events.append((device_id, rate_kbps, threshold))
 
-                rate_kbps = (delta_bytes / 1024) / delta_time if delta_time > 0 else 0.0
+                _prev_counters[device_id] = (total_bytes, now)
+        else:
+            counters = await asyncio.to_thread(_read_proc_net_dev)
+            veth_ifaces = {k: v for k, v in counters.items() if k.startswith("veth")}
+            if veth_ifaces:
+                logger.info("IPS poll: veth counters=%s devices_by_ip=%s", veth_ifaces, devices_by_ip)
 
-                threshold = _thresholds.get(device_id, DEFAULT_THRESHOLD_KBPS)
-                history_rows.append((device_id, rate_kbps))
+            for iface, rx_bytes in counters.items():
+                device_id = _interface_to_device_id(iface, devices_by_ip)
+                if device_id is None:
+                    continue
 
-                if rate_kbps > threshold:
-                    anomaly_events.append((device_id, rate_kbps, threshold))
+                if device_id in _prev_counters:
+                    prev_bytes, prev_time = _prev_counters[device_id]
+                    delta_bytes = rx_bytes - prev_bytes
+                    delta_time = now - prev_time
 
-            _prev_counters[device_id] = (rx_bytes, now)
+                    if delta_bytes < 0:
+                        delta_bytes += 2**64
+
+                    rate_kbps = (delta_bytes / 1024) / delta_time if delta_time > 0 else 0.0
+                    threshold = _thresholds.get(device_id, DEFAULT_THRESHOLD_KBPS)
+                    history_rows.append((device_id, rate_kbps))
+                    if rate_kbps > threshold:
+                        anomaly_events.append((device_id, rate_kbps, threshold))
+
+                _prev_counters[device_id] = (rx_bytes, now)
 
         if history_rows:
             await db.executemany(

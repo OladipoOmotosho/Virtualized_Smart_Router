@@ -1,12 +1,19 @@
 import { useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/contexts/ToastContext";
-import type { FirewallRule, FirewallRuleCreate } from "@/types";
+import type {
+  FirewallDeviceCounter,
+  FirewallRule,
+  FirewallRuleCreate,
+  FirewallRuleUpdate,
+} from "@/types";
 
 export function useFirewall() {
   const toast = useToast();
   const [rules, setRules] = useState<FirewallRule[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [counters, setCounters] = useState<FirewallDeviceCounter[]>([]);
+  const [countersLoading, setCountersLoading] = useState(false);
 
   const fetchRules = useCallback(async () => {
     try {
@@ -28,6 +35,25 @@ export function useFirewall() {
         return true;
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to add rule");
+        return false;
+      }
+    },
+    [toast],
+  );
+
+  const updateRule = useCallback(
+    async (id: number, patch: FirewallRuleUpdate) => {
+      try {
+        const updated = await api.patch<FirewallRule>(
+          `/firewall/rules/${id}`,
+          patch,
+        );
+        setRules((prev) => prev.map((r) => (r.id === id ? updated : r)));
+        return true;
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Failed to update rule",
+        );
         return false;
       }
     },
@@ -64,12 +90,30 @@ export function useFirewall() {
     }
   }, [toast]);
 
+  const fetchCounters = useCallback(async () => {
+    try {
+      setCountersLoading(true);
+      const data = await api.get<FirewallDeviceCounter[]>("/firewall/counters");
+      setCounters(data);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to load counters",
+      );
+    } finally {
+      setCountersLoading(false);
+    }
+  }, [toast]);
+
   return {
     rules,
     isLoading,
+    counters,
+    countersLoading,
     fetchRules,
     addRule,
+    updateRule,
     deleteRule,
     applyRules,
+    fetchCounters,
   };
 }

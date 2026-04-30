@@ -13,8 +13,10 @@ class TestIpsService:
 
     def test_interface_to_device_id_maps_veth(self):
         """veth<n> interface names map to device ID n."""
-        assert _interface_to_device_id("veth1", {}) == 1
-        assert _interface_to_device_id("veth42", {}) == 42
+        assert _interface_to_device_id("veth1", {}) is None
+        assert _interface_to_device_id("veth42", {}) is None
+        assert _interface_to_device_id("veth1", {"10.0.0.2": 1}) == 1
+        assert _interface_to_device_id("veth42", {"10.0.0.43": 42}) == 42
 
     def test_interface_to_device_id_unknown_returns_none(self):
         """Non-veth interfaces that cannot be mapped return None."""

@@ -64,6 +64,23 @@ export interface FirewallRuleCreate {
   protocol: Protocol;
 }
 
+export interface FirewallRuleUpdate {
+  device_id?: number;
+  dest_ip?: string;
+  dest_port?: number;
+  protocol?: Protocol;
+  clear_port?: boolean;
+}
+
+export interface FirewallDeviceCounter {
+  device_id: number;
+  ip: string;
+  rx_bytes: number;
+  tx_bytes: number;
+  rx_packets: number;
+  tx_packets: number;
+}
+
 // ── IPS ──────────────────────────────────────────────────────────────────────
 
 export interface IpsAlert {
