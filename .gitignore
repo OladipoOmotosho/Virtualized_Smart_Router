@@ -1,4 +1,4 @@
-# LLM / AI agent artifacts
+# Ignore files and directories template for project 
 .agent/
 .claude/
 CLAUDE.md

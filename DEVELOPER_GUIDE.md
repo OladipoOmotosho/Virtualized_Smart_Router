@@ -24,12 +24,12 @@
 
 Ensure you have the following installed before proceeding:
 
-| Tool | Version | Download |
-|------|---------|----------|
-| Python | 3.11 or higher | [python.org](https://www.python.org/downloads/) |
-| Node.js | 18 or higher | [nodejs.org](https://nodejs.org/) |
-| Yarn | 1.22+ | [yarnpkg.com](https://classic.yarnpkg.com/en/docs/install) |
-| Git | Latest | [git-scm.com](https://git-scm.com/) |
+| Tool    | Version        | Download                                                   |
+| ------- | -------------- | ---------------------------------------------------------- |
+| Python  | 3.11 or higher | [python.org](https://www.python.org/downloads/)            |
+| Node.js | 18 or higher   | [nodejs.org](https://nodejs.org/)                          |
+| Yarn    | 1.22+          | [yarnpkg.com](https://classic.yarnpkg.com/en/docs/install) |
+| Git     | Latest         | [git-scm.com](https://git-scm.com/)                        |
 
 ### Verify installations
 
@@ -58,6 +58,7 @@ The backend is a Python FastAPI application located in the `backend/` directory.
 ### 1. Create a virtual environment
 
 **Windows (PowerShell):**
+
 ```powershell
 cd backend
 python -m venv venv
@@ -65,6 +66,7 @@ python -m venv venv
 ```
 
 **macOS / Linux:**
+
 ```bash
 cd backend
 python3 -m venv venv
@@ -84,11 +86,13 @@ pip install -r requirements.txt
 Copy the example environment file and update it with your values:
 
 **Windows (PowerShell):**
+
 ```powershell
 Copy-Item ..\\.env.example -Destination ..\\.env
 ```
 
 **macOS / Linux:**
+
 ```bash
 cp ../.env.example ../.env
 ```
@@ -119,6 +123,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Verify the server is running:
+
 ```bash
 curl http://localhost:8000/health
 # Expected: {"status":"ok"}
@@ -160,6 +165,7 @@ You need **two terminals** running simultaneously during development.
 ### Terminal 1 — Backend
 
 **Windows (PowerShell):**
+
 ```powershell
 cd backend
 .\venv\Scripts\activate
@@ -167,6 +173,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 **macOS / Linux:**
+
 ```bash
 cd backend
 source venv/bin/activate
@@ -184,13 +191,13 @@ yarn dev
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-| Page | URL | Description |
-|------|-----|-------------|
-| Devices | `/` | View and manage discovered IoT devices |
-| Capture | `/capture` | Start/stop packet captures, manage pcap files |
-| Firewall | `/firewall` | Configure whitelist firewall rules |
-| IPS | `/ips` | Monitor intrusion detection alerts |
-| Logs | `/logs` | Traffic graphs and system activity logs |
+| Page     | URL         | Description                                               |
+| -------- | ----------- | --------------------------------------------------------- |
+| Devices  | `/`         | View and manage discovered IoT devices                    |
+| Capture  | `/capture`  | Start/stop packet captures, manage pcap files             |
+| Firewall | `/firewall` | Configure whitelist firewall rules and view live counters |
+| IPS      | `/ips`      | Monitor intrusion detection alerts                        |
+| Logs     | `/logs`     | Traffic graphs and system activity logs                   |
 
 ---
 
@@ -201,6 +208,7 @@ The full feature set (device discovery, packet capture, firewall enforcement, IP
 ### VM Prerequisites
 
 Install these on the CentOS VM:
+
 ```bash
 sudo dnf install -y tcpdump iptables bridge-utils iproute
 ```
@@ -216,10 +224,10 @@ sudo bash scripts/setup-namespaces.sh
 This creates:
 
 | Namespace | IP Address | Interface |
-|-----------|-----------|-----------|
-| ns1 | 10.0.0.2 | veth1 |
-| ns2 | 10.0.0.3 | veth2 |
-| ns3 | 10.0.0.4 | veth3 |
+| --------- | ---------- | --------- |
+| ns1       | 10.0.0.2   | veth1     |
+| ns2       | 10.0.0.3   | veth2     |
+| ns3       | 10.0.0.4   | veth3     |
 
 ### Verify the setup
 
@@ -240,6 +248,7 @@ cat /proc/net/arp
 ### Reset iptables (development only)
 
 To clear all firewall rules and return to a default-open state:
+
 ```bash
 sudo bash scripts/reset-iptables.sh
 ```
@@ -264,45 +273,53 @@ Then run the frontend locally with `yarn dev` — it will proxy to the VM's back
 The backend exposes a REST API at `http://localhost:8000/api/`.
 
 ### Health Check
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/health` | Returns `{"status": "ok"}` |
+
+| Method | Endpoint  | Description                |
+| ------ | --------- | -------------------------- |
+| `GET`  | `/health` | Returns `{"status": "ok"}` |
 
 ### Devices
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/devices/` | List all discovered devices |
-| `POST` | `/api/devices/scan` | Trigger a network scan |
+
+| Method  | Endpoint            | Description                                |
+| ------- | ------------------- | ------------------------------------------ |
+| `GET`   | `/api/devices/`     | List all discovered devices                |
+| `POST`  | `/api/devices/scan` | Trigger a network scan                     |
 | `PATCH` | `/api/devices/{id}` | Update device metadata (name, model, etc.) |
 
 ### Packet Capture
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/packet-capture/start` | Start capture for one or more devices |
-| `POST` | `/api/packet-capture/stop` | Stop an active capture session |
-| `GET` | `/api/packet-capture/files` | List saved .pcap files |
-| `DELETE` | `/api/packet-capture/files/{name}` | Delete a pcap file |
+
+| Method   | Endpoint                           | Description                           |
+| -------- | ---------------------------------- | ------------------------------------- |
+| `POST`   | `/api/packet-capture/start`        | Start capture for one or more devices |
+| `POST`   | `/api/packet-capture/stop`         | Stop an active capture session        |
+| `GET`    | `/api/packet-capture/files`        | List saved .pcap files                |
+| `DELETE` | `/api/packet-capture/files/{name}` | Delete a pcap file                    |
 
 ### Firewall
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/firewall/rules` | List all whitelist rules |
-| `POST` | `/api/firewall/rules` | Add a new whitelist rule |
-| `DELETE` | `/api/firewall/rules/{id}` | Delete a rule |
-| `POST` | `/api/firewall/apply` | Apply all rules to iptables |
+
+| Method   | Endpoint                   | Description                    |
+| -------- | -------------------------- | ------------------------------ |
+| `GET`    | `/api/firewall/rules`      | List all whitelist rules       |
+| `POST`   | `/api/firewall/rules`      | Add a new whitelist rule       |
+| `PATCH`  | `/api/firewall/rules/{id}` | Edit an existing rule          |
+| `DELETE` | `/api/firewall/rules/{id}` | Delete a rule                  |
+| `POST`   | `/api/firewall/apply`      | Apply all rules to iptables    |
+| `GET`    | `/api/firewall/counters`   | Live per-device RX/TX counters |
 
 ### IPS
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/ips/status` | IPS monitoring status and thresholds |
-| `GET` | `/api/ips/alerts` | List IPS anomaly alerts |
+
+| Method | Endpoint          | Description                          |
+| ------ | ----------------- | ------------------------------------ |
+| `GET`  | `/api/ips/status` | IPS monitoring status and thresholds |
+| `GET`  | `/api/ips/alerts` | List IPS anomaly alerts              |
 
 ### Logs
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/logs/traffic?days=7&device_id=1` | Traffic rate history |
-| `GET` | `/api/logs/system?page=1&limit=20` | Paginated system logs |
-| `DELETE` | `/api/logs/purge` | Delete old log records |
+
+| Method   | Endpoint                               | Description            |
+| -------- | -------------------------------------- | ---------------------- |
+| `GET`    | `/api/logs/traffic?days=7&device_id=1` | Traffic rate history   |
+| `GET`    | `/api/logs/system?page=1&limit=20`     | Paginated system logs  |
+| `DELETE` | `/api/logs/purge`                      | Delete old log records |
 
 > Interactive API docs are available at [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI).
 
@@ -317,12 +334,14 @@ cd backend
 ```
 
 **Windows (PowerShell):**
+
 ```powershell
 .\venv\Scripts\activate
 pytest
 ```
 
 **macOS / Linux:**
+
 ```bash
 source venv/bin/activate
 pytest
@@ -340,6 +359,7 @@ yarn typecheck
 ### Linting
 
 **Backend (Ruff):**
+
 ```bash
 cd backend
 ruff check .
@@ -347,6 +367,7 @@ ruff format --check .
 ```
 
 **Frontend (ESLint + Prettier):**
+
 ```bash
 cd frontend
 yarn lint
@@ -369,6 +390,7 @@ This outputs optimized static files to `frontend/dist/`.
 ### Serve from the VM
 
 Option A — Use a reverse proxy (recommended):
+
 ```bash
 # Install nginx
 sudo dnf install -y nginx
@@ -382,6 +404,7 @@ sudo cp -r frontend/dist/* /usr/share/nginx/html/
 ```
 
 Option B — Serve static files from FastAPI directly (simpler):
+
 ```python
 # Add to main.py:
 from fastapi.staticfiles import StaticFiles
@@ -403,32 +426,41 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
 ## Troubleshooting
 
 ### `ModuleNotFoundError: No module named 'aiosqlite'`
+
 You're running with the system Python instead of the virtual environment.  
 **Fix:** Activate the venv first:
+
 - Windows: `.\venv\Scripts\activate`
 - macOS/Linux: `source venv/bin/activate`
 
 ### `/proc/net/arp not found` warning
+
 Expected on Windows and macOS. Device discovery and IPS monitoring require Linux.  
 The backend will still start — these features just won't return data.
 
 ### Frontend shows "Failed to load devices"
+
 The backend isn't running or the proxy isn't configured.  
 **Fix:** Ensure the backend is running on port 8000 and the Vite dev server is started.
 
 ### `iptables: command not found`
+
 Firewall features require Linux with iptables installed.  
 **Fix:** `sudo dnf install -y iptables` (CentOS) or `sudo apt install -y iptables` (Ubuntu).
 
 ### `tcpdump: permission denied`
+
 Packet capture requires root privileges.  
 **Fix:** Run the backend with `sudo` or grant `CAP_NET_RAW`:
+
 ```bash
 sudo setcap cap_net_raw+ep $(which tcpdump)
 ```
 
 ### Port 8000 or 5173 already in use
+
 **Fix:** Kill the existing process or use a different port:
+
 ```bash
 # Backend
 uvicorn main:app --reload --port 8001
@@ -437,6 +469,7 @@ uvicorn main:app --reload --port 8001
 ```
 
 ### SMTP email alerts not sending
+
 Gmail requires an App Password, not your regular password.  
 **Fix:** Go to [Google Account → App Passwords](https://myaccount.google.com/apppasswords), generate one, and put it in `.env`.
 

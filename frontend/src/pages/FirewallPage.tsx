@@ -197,7 +197,9 @@ export default function FirewallPage() {
                   <tr key={c.device_id} className="hover:bg-gray-50">
                     <td className="px-4 py-2 text-gray-700">
                       {(() => {
-                        const device = devices.find((d) => d.id === c.device_id);
+                        const device = devices.find(
+                          (d) => d.id === c.device_id,
+                        );
                         return (
                           device?.name ||
                           device?.ip ||
