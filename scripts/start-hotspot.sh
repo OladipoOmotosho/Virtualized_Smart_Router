@@ -12,13 +12,13 @@
 # - firewalld DROPs unsolicited DHCP requests; must be stopped.
 # - `systemctl restart hostapd` hangs on CentOS; we run hostapd as a child
 #   process with output redirected to a log file.
-# - NetworkManager will fight for control of wlp0s12u3; set managed=no first.
+# - NetworkManager will fight for control of wlp0s12u2; set managed=no first.
 # - The AR9271 re-enumerates during mode switch; the VM USB filter handles it.
 
 set -uo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────
-AP_IFACE="${AP_IFACE:-wlp0s12u3}"
+AP_IFACE="${AP_IFACE:-wlp0s12u2}"
 UPSTREAM_IFACE="${UPSTREAM_IFACE:-enp0s3}"
 SSID="${SSID:-SmartRouter-Demo}"
 WPA_PASS="${WPA_PASS:-SmartDemo2026}"
@@ -93,7 +93,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 if ! ip link show "${AP_IFACE}" &>/dev/null; then
-    # Adapter names can change across boots (for example wlp0s11u1 -> wlp0s12u3).
+    # Adapter names can change across boots (for example wlp0s11u1 -> wlp0s12u2).
     DETECTED_IFACE="$(iw dev 2>/dev/null | awk '/Interface/{print $2; exit}')"
     if [[ -n "${DETECTED_IFACE}" ]] && ip link show "${DETECTED_IFACE}" &>/dev/null; then
         warn "Interface ${AP_IFACE} not found; falling back to detected ${DETECTED_IFACE}"
