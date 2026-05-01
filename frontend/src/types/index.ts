@@ -88,6 +88,7 @@ export interface IpsAlert {
   device_id: number;
   measured_rate: number;
   threshold: number;
+  anomaly_type: "high" | "low";
   triggered_at: string;
 }
 
@@ -95,7 +96,14 @@ export interface IpsStatus {
   poll_interval_seconds: number;
   block_duration_seconds: number;
   monitored_devices: number;
-  thresholds: Record<number, number>;
+  alert_recipient: string;
+  min_threshold_kbps: number;
+  max_threshold_kbps: number;
+}
+
+export interface IpsSettingsUpdate {
+  min_threshold_kbps?: number;
+  max_threshold_kbps?: number;
 }
 
 // ── Logs ─────────────────────────────────────────────────────────────────────

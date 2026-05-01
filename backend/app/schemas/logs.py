@@ -16,6 +16,7 @@ class IpsAlertResponse(BaseModel):
     device_id: int
     measured_rate: float
     threshold: float
+    anomaly_type: str
     triggered_at: str
 
     model_config = {"from_attributes": True}

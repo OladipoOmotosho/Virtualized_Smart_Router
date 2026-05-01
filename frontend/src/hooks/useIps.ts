@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/contexts/ToastContext";
-import type { IpsAlert, IpsStatus } from "@/types";
+import type { IpsAlert, IpsSettingsUpdate, IpsStatus } from "@/types";
 
 const POLL_INTERVAL_MS = 10_000;
 
@@ -34,6 +34,25 @@ export function useIps() {
     }
   }, [toast]);
 
+  const updateSettings = useCallback(
+    async (patch: IpsSettingsUpdate) => {
+      try {
+        const data = await api.patch<IpsStatus>("/ips/settings", patch);
+        setStatus(data);
+        toast.success("IPS thresholds updated");
+        return data;
+      } catch (err) {
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Failed to update IPS thresholds",
+        );
+        return null;
+      }
+    },
+    [toast],
+  );
+
   // Auto-refresh alerts on a polling interval
   useEffect(() => {
     fetchStatus();
@@ -45,5 +64,5 @@ export function useIps() {
     return () => clearInterval(id);
   }, [fetchStatus, fetchAlerts]);
 
-  return { status, alerts, isLoading, fetchAlerts };
+  return { status, alerts, isLoading, fetchAlerts, updateSettings };
 }

@@ -74,8 +74,16 @@ CREATE TABLE IF NOT EXISTS ips_alerts (
     device_id      INTEGER NOT NULL,
     measured_rate  REAL    NOT NULL,
     threshold      REAL    NOT NULL,
+    anomaly_type   TEXT    NOT NULL DEFAULT 'high',
     triggered_at   TEXT    NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS ips_settings (
+    id                    INTEGER PRIMARY KEY CHECK (id = 1),
+    min_threshold_kbps    REAL    NOT NULL DEFAULT 0,
+    max_threshold_kbps    REAL    NOT NULL DEFAULT 10240,
+    updated_at            TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 """
 
@@ -90,4 +98,17 @@ async def init_db() -> None:
         columns = {row[1] for row in await cursor.fetchall()}
         if "ipv6" not in columns:
             await db.execute("ALTER TABLE devices ADD COLUMN ipv6 TEXT")
+
+        cursor = await db.execute("PRAGMA table_info(ips_alerts)")
+        alert_columns = {row[1] for row in await cursor.fetchall()}
+        if "anomaly_type" not in alert_columns:
+            await db.execute("ALTER TABLE ips_alerts ADD COLUMN anomaly_type TEXT NOT NULL DEFAULT 'high'")
+
+        await db.execute(
+            """
+            INSERT OR IGNORE INTO ips_settings (id, min_threshold_kbps, max_threshold_kbps)
+            VALUES (1, ?, ?)
+            """,
+            (settings.ips_min_threshold_kbps, settings.ips_max_threshold_kbps),
+        )
         await db.commit()

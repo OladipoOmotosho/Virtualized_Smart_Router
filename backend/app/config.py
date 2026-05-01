@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     pcap_dir: str = "pcaps"
     log_retention_days: int = 30
     ips_poll_interval: int = 5
+    ips_min_threshold_kbps: float = 0.0
+    ips_max_threshold_kbps: float = 10240.0
 
 
 settings = Settings()

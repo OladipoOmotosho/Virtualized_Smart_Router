@@ -37,6 +37,18 @@ const DAY_OPTIONS = [1, 3, 7, 14, 30];
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
+const torontoTimeFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Toronto",
+  dateStyle: "short",
+  timeStyle: "short",
+});
+
+const torontoTimeOnlyFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Toronto",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
 export default function LogsPage() {
   const {
     traffic,
@@ -141,7 +153,9 @@ export default function LogsPage() {
                 domain={["dataMin", "dataMax"]}
                 tickCount={8}
                 tick={{ fontSize: 11, fill: "#6b7280" }}
-                tickFormatter={(v: number) => new Date(v).toLocaleTimeString()}
+                tickFormatter={(v: number) =>
+                  torontoTimeOnlyFormatter.format(new Date(v))
+                }
                 padding={{ left: 12, right: 12 }}
               />
               <YAxis
@@ -154,7 +168,9 @@ export default function LogsPage() {
                 }}
               />
               <Tooltip
-                labelFormatter={(v: number) => new Date(v).toLocaleString()}
+                labelFormatter={(v: number) =>
+                  torontoTimeFormatter.format(new Date(v))
+                }
                 formatter={(v: number) => [`${Number(v).toFixed(1)} KB/s`, ""]}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
