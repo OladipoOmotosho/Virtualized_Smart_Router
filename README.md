@@ -4,56 +4,46 @@ INSE 6170 – PROJECT PROPOSAL
 IoT Security Gateway (Virtualized Smart Router)
 
 1. Introduction
-   This project proposes the design and implementation of virtualized IoT Security Gateway developed on a CentOS 9
-   virtual machine. The system will act as a software-based wireless router that manages IoT devices and enforces
-   network-level security policies. Instead of relying on physical hardware, the gateway and IoT devices will be simulated
-   using Linux network namespaces inside a single virtual machine. This approach allows full control over networking
-   behavior while keeping the environment lightweight and manageable. The goal of the project is to provide visibility,
-   traffic control, and anomaly detection for IoT devices at the network edge. As IoT devices continue to increase in homes
-   and organizations, they remain common targets for large scale attacks such as Mirai. This project focuses on improving
-   monitoring and enforcement directly at the gateway level.
+   This project is an IoT Security Gateway that acts as a software-based wireless router managing real IoT devices
+   and enforcing network-level security policies. The gateway runs on a Linux virtual machine (Ubuntu/CentOS) and monitors
+   real IoT devices connected to your network via WiFi, Ethernet, or USB. The system provides device discovery using ARP
+   table scanning, network-level firewall enforcement with iptables, packet capture with tcpdump, and anomaly detection
+   using iptables counters and traffic analysis. This approach enables full visibility and control over IoT device
+   communications at the gateway level. As IoT devices continue to proliferate in homes and organizations, they remain
+   common targets for large-scale attacks such as Mirai. This project focuses on improving monitoring and enforcement
+   directly at the gateway level.
 2. Platform & Technology Stack
-   The system will be implemented entirely on a CentOS 9 virtual machine to ensure full control over networking behavior
-   and security enforcement. The backend will be developed in Python using FastAPI, which will handle device discovery,
-   firewall rule management, packet capture, and intrusion prevention logic. The frontend will be built with React and will
-   serve as a web based administrative dashboard for managing devices and viewing logs. At the networking layer, iptables
-   will be used to enforce whitelist-based firewall policies, tcpdump will handle per device packet capture, and Linux
-   network namespaces will be used to simulate multiple IoT devices within the same virtual environment. SQLite will be
-   used to store device metadata, traffic logs, and historical data records. For visualization, Recharts will be integrated
-   into the dashboard to display historical traffic patterns and device activity. This technology stack keeps the system
-   practical, realistic, and fully controllable within a Linux environment while remaining manageable within the project
-   timeline.
+   The system is implemented on a Linux virtual machine (Ubuntu 26.0+ or CentOS 9+) to ensure full control over networking
+   behavior and security enforcement. The backend is developed in Python using FastAPI, which handles device discovery,
+   firewall rule management, packet capture, and intrusion prevention logic. The frontend is built with React and serves
+   as a web-based administrative dashboard for managing devices and viewing logs. At the networking layer, iptables
+   enforces whitelist-based firewall policies, tcpdump handles per-device packet capture, and the system uses ARP scanning
+   and /proc/net/dev parsing for device discovery and traffic monitoring. SQLite stores device metadata, traffic logs,
+   and historical data records. Recharts visualizes historical traffic patterns and device activity. This technology stack
+   provides a practical, realistic system while remaining manageable.
    Key Technologies
    Layer Technology Purpose
-   Frontend React Web based admin dashboard for device management and
-   monitoring
-   Backend Python + FastAPI REST API, device discovery, firewall control, packet capture,
-   IPS logic
-   Networking Linux network namespaces Simulate multiple IoT devices within one VM
-   Packet Capture tcpdump Capture and save per device pcap files
-   Firewall iptables Whitelist based traffic filtering and rule enforcement
-   Traffic
-   Monitoring
-   iptables counters /
-   /proc/net/dev
-   Measure per device data rate for anomaly detection
+   Frontend React Web-based admin dashboard for device management and monitoring
+   Backend Python + FastAPI REST API, device discovery, firewall control, packet capture, IPS logic
+   Device Discovery ARP table scanning Detect real IoT devices on the network
+   Packet Capture tcpdump Capture and save per-device pcap files
+   Firewall iptables Whitelist-based traffic filtering and rule enforcement
+   Traffic Monitoring iptables counters / /proc/net/dev Measure per-device data rate for anomaly detection
    Database SQLite Store device metadata, logs, firewall rules, traffic history
    Notifications Python smtplib Email alerts for abnormal behavior
    Visualization Recharts Display historical data rate graphs in dashboard
 3. Preliminary Architecture Design
-   The project follows a modular architecture, which are listed below:
-   i. Simulated IoT Devices:
-   Created using Linux network namespaces. Each namespace represents an independent IoT device with its own
-   IP address and traffic behavior.
+   The project follows a modular architecture:
+   i. Real IoT Devices:
+   Mobile phones, smart home devices, and other IoT equipment connected to the network via WiFi, Ethernet, or USB.
+   The gateway discovers them automatically using ARP scanning and /proc/net/dev parsing.
    ii. Gateway Layer:
-   Runs inside the main CentOS VM. It performs routing, firewall filtering, traffic monitoring, and packet capture.
+   Runs on the Linux VM. It performs device discovery, firewall filtering, traffic monitoring, and packet capture.
    iii. Backend API:
-   Built with FastAPI. Exposes REST endpoints for device listing, rule configuration, packet capture control, and log
-   access.
+   Built with FastAPI. Exposes REST endpoints for device listing, rule configuration, packet capture control, and log access.
    iv. Web Dashboard:
-   React-based interface used by the administrator to manage devices, configure policies, and view logs.
-   All components run within a single VM environment, which simplifies deployment and testing while maintaining
-   realistic networking behavior.
+   React-based interface used by the administrator to manage devices, configure policies, and view traffic logs.
+   All components run within the VM environment, providing a centralized management point for real network devices.
 4. Implementation Plan
    The five required functions will be implemented as follows:
    Device Discovery and Management:
@@ -100,7 +90,7 @@ IoT Security Gateway (Virtualized Smart Router)
 Project Timeline
 
 Week 1
-CentOS networking setup and namespace simulation
+Linux VM setup and networking prerequisites
 
 Week 2
 Device discovery and database integration

@@ -12,7 +12,7 @@
 3. [Backend Setup](#backend-setup)
 4. [Frontend Setup](#frontend-setup)
 5. [Running the Application](#running-the-application)
-6. [CentOS VM & Network Simulation](#centos-vm--network-simulation)
+6. [Device Setup](#device-setup)
 7. [API Reference](#api-reference)
 8. [Testing](#testing)
 9. [Production Build & Deployment](#production-build--deployment)
@@ -201,47 +201,31 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
-## CentOS VM & Network Simulation
+## Device Setup
 
-The full feature set (device discovery, packet capture, firewall enforcement, IPS) requires a **CentOS 9 VM** with Linux networking tools.
+The system monitors real IoT devices connected to your network. Devices are discovered automatically via ARP table scanning.
 
-### VM Prerequisites
+### Network Requirements
 
-Install these on the CentOS VM:
+Ensure real devices are connected to your network:
+
+- **Mobile phones:** WiFi or USB tethering
+- **IoT devices:** Connected via WiFi, Ethernet, or USB
+- **Gateway VM:** Must be on the same network segment for ARP visibility
+
+### Verify device discovery
+
+Once the backend is running, devices appear automatically on the **Devices** page as they communicate on the network.
+
+Manually trigger a network scan:
 
 ```bash
-sudo dnf install -y tcpdump iptables bridge-utils iproute
+curl -X POST http://localhost:8000/api/devices/scan
 ```
 
-### Create simulated IoT devices
-
-The script creates 3 network namespaces that simulate IoT devices:
+Check the ARP table to verify network visibility:
 
 ```bash
-sudo bash scripts/setup-namespaces.sh
-```
-
-This creates:
-
-| Namespace | IP Address | Interface |
-| --------- | ---------- | --------- |
-| ns1       | 10.0.0.2   | veth1     |
-| ns2       | 10.0.0.3   | veth2     |
-| ns3       | 10.0.0.4   | veth3     |
-
-### Verify the setup
-
-```bash
-# List namespaces
-ip netns list
-
-# Test connectivity
-ping -c 3 10.0.0.2
-
-# Test outbound from a simulated device
-ip netns exec ns1 ping -c 3 8.8.8.8
-
-# Check ARP table (used by device discovery)
 cat /proc/net/arp
 ```
 
