@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 AnomalyType = Literal["high", "low"]
 
+# Ignore rate samples when the interval is too small to be meaningful.
+MIN_SAMPLE_INTERVAL_SECONDS: float = 0.25
+
 # How long (seconds) to temporarily block a device after a high anomaly.
 BLOCK_DURATION_SECONDS: int = 30
 
@@ -145,13 +148,21 @@ async def _poll_devices() -> None:
             for device_id, total_bytes in counter_map.items():
                 if device_id in _prev_counters:
                     prev_bytes, prev_time = _prev_counters[device_id]
-                    delta_bytes = total_bytes - prev_bytes
                     delta_time = now - prev_time
 
-                    if delta_bytes < 0:
-                        delta_bytes += 2**64
+                    if total_bytes < prev_bytes:
+                        # Counter reset/restart. Treat this as a fresh baseline
+                        # instead of a wraparound so we do not emit a bogus spike.
+                        _prev_counters[device_id] = (total_bytes, now)
+                        continue
 
-                    rate_kbps = (delta_bytes / 1024) / delta_time if delta_time > 0 else 0.0
+                    if delta_time < MIN_SAMPLE_INTERVAL_SECONDS:
+                        _prev_counters[device_id] = (total_bytes, now)
+                        continue
+
+                    delta_bytes = total_bytes - prev_bytes
+
+                    rate_kbps = (delta_bytes / 1024) / delta_time
                     history_rows.append((device_id, rate_kbps))
 
                     if rate_kbps > max_threshold_kbps:
@@ -173,13 +184,19 @@ async def _poll_devices() -> None:
 
                 if device_id in _prev_counters:
                     prev_bytes, prev_time = _prev_counters[device_id]
-                    delta_bytes = rx_bytes - prev_bytes
                     delta_time = now - prev_time
 
-                    if delta_bytes < 0:
-                        delta_bytes += 2**64
+                    if rx_bytes < prev_bytes:
+                        _prev_counters[device_id] = (rx_bytes, now)
+                        continue
 
-                    rate_kbps = (delta_bytes / 1024) / delta_time if delta_time > 0 else 0.0
+                    if delta_time < MIN_SAMPLE_INTERVAL_SECONDS:
+                        _prev_counters[device_id] = (rx_bytes, now)
+                        continue
+
+                    delta_bytes = rx_bytes - prev_bytes
+
+                    rate_kbps = (delta_bytes / 1024) / delta_time
                     history_rows.append((device_id, rate_kbps))
 
                     if rate_kbps > max_threshold_kbps:
