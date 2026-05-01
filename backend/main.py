@@ -1,4 +1,5 @@
 import asyncio
+import os
 import logging
 from contextlib import asynccontextmanager
 
@@ -19,6 +20,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+
+    if os.geteuid() != 0:
+        logger.warning(
+            "Backend is running without root privileges. Firewall counters and IPS monitoring depend on iptables and may not work. Start the backend with sudo."
+        )
 
     # Re-apply saved firewall rules on startup
     try:

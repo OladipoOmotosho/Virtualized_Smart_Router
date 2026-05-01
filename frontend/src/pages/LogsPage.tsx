@@ -63,6 +63,15 @@ export default function LogsPage() {
     fetchSystemLogs(page);
   }, [fetchSystemLogs, page]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      fetchTraffic();
+      fetchSystemLogs(page);
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [fetchTraffic, fetchSystemLogs, page]);
+
   const totalPages = systemLogs
     ? Math.max(1, Math.ceil(systemLogs.total / systemLogs.limit))
     : 1;
@@ -90,10 +99,7 @@ export default function LogsPage() {
             Traffic history and system activity
           </p>
         </div>
-        <Button
-          variant="danger"
-          onClick={() => setPurgeModalOpen(true)}
-        >
+        <Button variant="danger" onClick={() => setPurgeModalOpen(true)}>
           <Trash2 size={14} /> Purge Old Logs
         </Button>
       </div>
@@ -140,7 +146,12 @@ export default function LogsPage() {
               />
               <YAxis
                 tick={{ fontSize: 11, fill: "#6b7280" }}
-                label={{ value: "KB/s", angle: -90, position: "insideLeft", style: { fontSize: 12, fill: "#6b7280" } }}
+                label={{
+                  value: "KB/s",
+                  angle: -90,
+                  position: "insideLeft",
+                  style: { fontSize: 12, fill: "#6b7280" },
+                }}
               />
               <Tooltip
                 labelFormatter={(v: number) => new Date(v).toLocaleString()}

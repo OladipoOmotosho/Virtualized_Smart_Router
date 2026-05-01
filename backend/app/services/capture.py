@@ -6,7 +6,7 @@ import logging
 import os
 import re
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.config import settings
@@ -158,7 +158,7 @@ async def list_pcap_files() -> list[PcapFileResponse]:
             PcapFileResponse(
                 filename=filename,
                 size_bytes=stat.st_size,
-                created_at=datetime.fromtimestamp(stat.st_ctime).isoformat(),
+                created_at=datetime.fromtimestamp(stat.st_ctime, tz=timezone.utc).isoformat(),
             )
         )
     return files
